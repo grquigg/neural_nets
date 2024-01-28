@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 unsigned char * openUByte(char * path) {
     FILE *ptr;
@@ -34,8 +35,16 @@ void printVector(float * vec, int vec_height, int vec_width) {
     }
 }
 
-void returnProduct(float ** weights, float **vectors, float weight_h, float weight_w, float vector_h, float vector_w) {
-
+void dotProduct(float **weights, float **vectors, int weight_h, int weight_w, int vector_h, int vector_w) {
+    //if we have a matrix of H*W, then vector_h == weight_w
+    if(weight_w != vector_h) {
+        printf("INVALID VALUES FOR MATRIX AND VECTOR\n");
+        return;
+    }
+    //initialize the matrix
+    float *product = malloc(sizeof(*product)*weight_w*vector_h);
+    memset(product, 0.0, (weight_w*vector_h) * sizeof( *product));
+    return;
 }
 
 void printMatrix(float ** matrix, int mat_height, int mat_width) {
@@ -94,7 +103,16 @@ int main(void) {
     printVector(output[0], 10, 1);
     float * weights[height];
     initializeRandomArray(width*height, 1, weights);
-    float **product;
     // printMatrix(weights, 1, width*height);
+    //test dotProduct function
+    float matrix[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
+    float vector[3][1] = {{1.0}, {2.0}, {3.0}};
+    // printf("%f", matrix[2][2]);
+    //the resulting matrix should be a 3x1 matrix with the values
+    /*  [1.0]
+        [2.0]
+        [3.0]
+    */
+    dotProduct((float **) matrix, (float **) vector, 3, 3, 3, 1);
     return 0;
 }
