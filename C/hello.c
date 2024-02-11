@@ -19,7 +19,7 @@ unsigned char * openUByte(char * path) {
 void initializeRandomArray(int height, int width, float ** weights) {
     int a = 1;
     for (int i = 0; i < height; i++) {
-        weights[i] = (float *)malloc(sizeof(float)*width);
+        weights[i] = (float*)malloc(sizeof(float) * width);
         for(int j = 0; j < width; j++) {
             weights[i][j] = (float)rand()/(float)(RAND_MAX/a);
         }
@@ -35,16 +35,27 @@ void printVector(float * vec, int vec_height, int vec_width) {
     }
 }
 
-void dotProduct(float **weights, float **vectors, int weight_h, int weight_w, int vector_h, int vector_w) {
+void dotProduct(int weight_h, int weight_w, int vector_h, int vector_w, float ** weights, float ** vectors, float ** product) {
     //if we have a matrix of H*W, then vector_h == weight_w
     if(weight_w != vector_h) {
         printf("INVALID VALUES FOR MATRIX AND VECTOR\n");
         return;
     }
     //initialize the matrix
-    float *product = malloc(sizeof(*product)*weight_w*vector_h);
-    memset(product, 0.0, (weight_w*vector_h) * sizeof( *product));
-    return;
+    //printf("Product\n");
+    for(int i = 0; i < weight_h; i++) {
+        product[i] = (float*)malloc(10 * sizeof(float));
+        for(int j = 0; j < vector_w; j++) {
+            //printf("New entry\n");
+            //printf("%d %d %f\n", i, j, weights[i][j]);
+            for(int k = 0; k < weight_w; k++) {
+                //printf("%f\n", weights[i][k]);
+                product[i][j] += weights[i][k] * vectors[k][j];
+                //printf("Temp product: %f\n", product[i][j]);
+            }
+            //printf("%f\n", product[i][j]);
+        }
+    }
 }
 
 void printMatrix(float ** matrix, int mat_height, int mat_width) {
@@ -69,50 +80,63 @@ int main(void) {
     vals[3] = vals[3] >> 24;
     vals[2] = vals[2] >> 24;
     vals[1] = 60000;
-    int size = vals[1];
+    const int size = vals[1];
     int width = vals[2];
     int height = vals[3];
-    //read in all of the data at once using malloc
-    unsigned char *data;
-    data = (unsigned char *)malloc(sizeof(unsigned char)*vals[1]*vals[2]*vals[3]);
-    count = fread(data, sizeof(unsigned char), vals[1]*vals[2]*vals[3], fptr);
+    //read in all of the data at once using mall
+    unsigned char* data;
+    data = (unsigned char*)malloc(sizeof(unsigned char) * vals[1] * vals[2] * vals[3]);
+    count = fread(data, sizeof(unsigned char), vals[1] * vals[2] * vals[3], fptr);
     fclose(fptr);
     //and now to try to open the training labels
-    unsigned char *labels = openUByte(train_labels_path);
+    printf("outputs\n");
+    unsigned char* labels = openUByte(train_labels_path);
+
 
     //all of the data is stored! the next thing that needs to be done is to convert the image data and
     //the label data into floats and ints, respectively
     //we're not going to have negative pixel values but we still need the precision for the linear algebra that we're
-    //going to need to be doing
-    //we will most likely need an array of float pointers for this in order to do the math quickly
-    float * input[size];
+    ////going to need to be doing
+    ////we will most likely need an array of float pointers for this in order to do the math quickly
+    float **input;
+    input = (float**) malloc(sizeof(float**) * size);
+    //
+    //printf("This is a test\n");
     for(int i = 0; i < size; i++) {
-        input[i] = (float *)malloc(width*height*sizeof(float));
+        input[i] = (float*)malloc(sizeof(float) * width * height);
         for(int j = 0; j < width*height; j++) {
             input[i][j] = (float) data[(i*width*height)+j] / 255;
-        }
+       }
     }
     free(data);
-    //and we also need to cast each of the labels into a one hot vector
-    float * output[size];
+    printf("%d\n", size);
+    ////and we also need to cast each of the labels into a one hot vector
+    float ** output;
+    output = (float**)malloc(sizeof(float**) * size);
     for (int i = 0; i < size; i++) {
         output[i] = (float *)malloc(10*sizeof(float));
         output[i][labels[i]]++;
     }
     printVector(input[0], width, height);
     printVector(output[0], 10, 1);
-    float * weights[height];
-    initializeRandomArray(width*height, 1, weights);
-    // printMatrix(weights, 1, width*height);
+    float **weights;
+    weights = (float**)malloc(sizeof(float**)*width*height);
+    initializeRandomArray(width*height, 10, weights);
     //test dotProduct function
-    float matrix[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
-    float vector[3][1] = {{1.0}, {2.0}, {3.0}};
+    // float matrix[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
+    // float vector[3][1] = {{1.0}, {2.0}, {3.0}};
     // printf("%f", matrix[2][2]);
     //the resulting matrix should be a 3x1 matrix with the values
     /*  [1.0]
         [2.0]
         [3.0]
     */
-    dotProduct((float **) matrix, (float **) vector, 3, 3, 3, 1);
+    float** product;
+    product = (float**)malloc(sizeof(float**)*size);
+    dotProduct(size, width * height, width * height, 10, input, weights, product);
+    printMatrix(product, 10, size);
+    // dotProduct(3, 3, 3, 1, matrix, vector, product);
+    // dotProduct(size, wid)
+    //printf("End of execution\n");
     return 0;
 }
