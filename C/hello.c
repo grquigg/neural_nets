@@ -22,6 +22,8 @@ void initializeRandomArray(int height, int width, float ** weights) {
         weights[i] = (float*)malloc(sizeof(float) * width);
         for(int j = 0; j < width; j++) {
             weights[i][j] = (float)rand()/(float)(RAND_MAX/a);
+            //the most important line in the entire program
+            weights[i][j] -= 0.5;
         }
     }
 }
@@ -58,9 +60,27 @@ void dotProduct(int weight_h, int weight_w, int vector_h, int vector_w, float **
     }
 }
 
+void softmax(float** product, int product_height, int product_width) {
+    float total = 0.0;
+    float logSumTotal = 0.0;
+    for (int i = 0; i < product_height; i++) {
+        total = 0.0;
+        for (int j = 0; j < product_width; j++) {
+            total += exp(product[i][j]);
+        }
+        logSumTotal = logf(total);
+        float prob_sums = 0.0;
+        for (int j = 0; j < product_width; j++) {
+            product[i][j] = exp(product[i][j] - logSumTotal);
+            prob_sums += product[i][j];
+        }
+        
+    }
+}
+
 void printMatrix(float ** matrix, int mat_height, int mat_width) {
-    for(int i = 0; i < mat_width; i++) {
-        for(int j = 0; j < mat_height; j++) {
+    for(int i = 0; i < mat_height; i++) {
+        for(int j = 0; j < mat_width; j++) {
             printf("%.2f\t", matrix[i][j]);
         }
         printf("\n");
@@ -134,9 +154,10 @@ int main(void) {
     float** product;
     product = (float**)malloc(sizeof(float**)*size);
     dotProduct(size, width * height, width * height, 10, input, weights, product);
-    printMatrix(product, 10, size);
+    //printMatrix(product, 10, size);
     // dotProduct(3, 3, 3, 1, matrix, vector, product);
     // dotProduct(size, wid)
     //printf("End of execution\n");
+    softmax(product, 10, 10);
     return 0;
 }
