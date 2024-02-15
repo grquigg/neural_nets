@@ -1,7 +1,9 @@
+#define OVERFLOW_FLAG 1.175494351e-33F
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <stdbool.h>
 
 unsigned char * openUByte(char * path) {
     FILE *ptr;
@@ -23,7 +25,6 @@ void initializeRandomArray(int height, int width, float ** weights) {
         for(int j = 0; j < width; j++) {
             weights[i][j] = (float)rand()/(float)(RAND_MAX/a);
             //the most important line in the entire program
-            weights[i][j] -= 0.5;
         }
     }
 }
@@ -37,22 +38,57 @@ void printVector(float * vec, int vec_height, int vec_width) {
     }
 }
 
-void dotProduct(int weight_h, int weight_w, int vector_h, int vector_w, float ** weights, float ** vectors, float ** product) {
+void dotProductWithTranspose(int weight_h, int weight_w, int vector_h, int vector_w, float** weights, float** vectors, float** product) {
+    printf("Compute dot product with transpose\n");
+    //whichever matrix is given first is the one that will be transposed
+    //resulting matrix will be of size weight_w, vector_w
+    //"row"
+    for (int row = 0; row < weight_w; row++) {
+        product[row] = (float*)malloc(vector_w * sizeof(float));
+        for (int col = 0; col < vector_w; col++) {
+            product[row][col] = 0;
+            for (int j = 0; j < vector_h; j++) {
+                if (weights[j][row] < OVERFLOW_FLAG) {
+                    continue;
+                }
+                product[row][col] += weights[j][row] * vectors[j][col];
+                //printf("product at %d %d: %.15f\n", row, col, product[row][col]);
+                //if (product[row][col] > 10000) {
+                //    printf("Problem children: %.15f %.15f %.15f\n", weights[j][row], vectors[j][col], weights[j][row] * vectors[j][col]);
+                //    printf("Product at %d %d: %f\n", row, col, product[row][col]);
+                //}
+            }
+            //printf("Answer at %d %d: %f\n", row, col, product[row][col]);
+        }
+    }
+}
+
+void dotProduct(int weight_h, int weight_w, int vector_h, int vector_w, float ** weights, float ** vectors, float ** product, bool inverse) {
     //if we have a matrix of H*W, then vector_h == weight_w
+    if (inverse) {
+        dotProductWithTranspose(weight_h, weight_w, vector_h, vector_w, weights, vectors, product);
+        return;
+    }
     if(weight_w != vector_h) {
         printf("INVALID VALUES FOR MATRIX AND VECTOR\n");
         return;
     }
     //initialize the matrix
-    //printf("Product\n");
+    printf("Product\n");
     for(int i = 0; i < weight_h; i++) {
-        product[i] = (float*)malloc(10 * sizeof(float));
+        product[i] = (float*)malloc(vector_w * sizeof(float));
+        //printf("Success %d\n", i);
         for(int j = 0; j < vector_w; j++) {
+            product[i][j] = 0;
             //printf("New entry\n");
             //printf("%d %d %f\n", i, j, weights[i][j]);
             for(int k = 0; k < weight_w; k++) {
                 //printf("%f\n", weights[i][k]);
                 product[i][j] += weights[i][k] * vectors[k][j];
+                if (product[i][j] > 10000) {
+                    printf("Problem children from normal dot product: %.15f %.15f\n", weights[i][k], vectors[k][j]);
+                    printf("Product at %d %d: %f\n", i, j, product[i][j]);
+                }
                 //printf("Temp product: %f\n", product[i][j]);
             }
             //printf("%f\n", product[i][j]);
@@ -78,13 +114,72 @@ void softmax(float** product, int product_height, int product_width) {
     }
 }
 
+void matrixSubtract(float ** matrix1, float **matrix2, float m1_h, float m1_w, float m2_h, float m2_w, float scalar) {
+    if (m1_h == m2_h && m1_w == m2_w) {
+        for (int i = 0; i < m1_h; i++) {
+            for (int j = 0; j < m1_w; j++) {
+                matrix1[i][j]-=matrix2[i][j];
+                matrix1[i][j] *= scalar;
+            }
+        }
+    }
+}
+
+void matrixAdd(float** matrix1, float** matrix2, float m1_h, float m1_w, float m2_h, float m2_w) {
+    if (m1_h == m2_h && m1_w == m2_w) {
+        for (int i = 0; i < m1_h; i++) {
+            for (int j = 0; j < m1_w; j++) {
+                matrix1[i][j] += matrix2[i][j];
+            }
+        }
+    }
+}
+void multiplyMatrixByScalar(float** matrix, int matrix_height, int matrix_width, float scalar) {
+    for (int i = 0; i < matrix_height; i++) {
+        for (int j = 0; j < matrix_width; j++) {
+            matrix[i][j] *= scalar;
+        }
+    }
+}
+
+float crossEntropyLoss(float** loss, int matrix_height, int matrix_width) {
+    float log_sum = 0;
+    for (int i = 0; i < matrix_height; i++) {
+        for (int j = 0; j < matrix_width; j++) {
+            if (loss[i][j] != 0) {
+                log_sum -= logf(fabsf(loss[i][j]));
+            }
+        }
+    }
+    return log_sum;
+}
 void printMatrix(float ** matrix, int mat_height, int mat_width) {
     for(int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
-            printf("%.2f\t", matrix[i][j]);
+            printf("%f\t", matrix[i][j]);
         }
         printf("\n");
     }
+}
+
+float computeAccuracy(float** output, int output_h, int output_w, float** predicted) {
+    int correct = 0;
+    for (int i = 0; i < output_h; i++) {
+        int max = 0;
+        float max_score = 0.0;
+        int actual = 0;
+        for (int j = 0; j < output_w; j++) {
+            if (predicted[i][j] > max_score) {
+                max = j;
+                max_score = predicted[i][j];
+            }
+            if (output[i][j] == 1) {
+                actual = j;
+            }
+        }
+        if (actual == max) correct++;
+    }
+    return (float) correct / output_h;
 }
 
 int main(void) {
@@ -93,7 +188,8 @@ int main(void) {
     char train_labels_path[] = "../mnist/train-labels.idx1-ubyte";
     fptr = fopen(train_data_path, "rb");
     unsigned int vals[4];
-
+    float learning_rate = 0.0005;
+    int epochs = 10;
     //the values are definitely stored as big endian
     int count = fread(vals,4,4, fptr);
     // Print the file content
@@ -112,7 +208,7 @@ int main(void) {
     printf("outputs\n");
     unsigned char* labels = openUByte(train_labels_path);
 
-
+    int BATCH_SIZE = 10000;
     //all of the data is stored! the next thing that needs to be done is to convert the image data and
     //the label data into floats and ints, respectively
     //we're not going to have negative pixel values but we still need the precision for the linear algebra that we're
@@ -137,27 +233,89 @@ int main(void) {
         output[i] = (float *)malloc(10*sizeof(float));
         output[i][labels[i]]++;
     }
-    printVector(input[0], width, height);
-    printVector(output[0], 10, 1);
+    //EXAMPLES FOR TESTING
+    //float** test_input;
+    //test_input = (float**)malloc(sizeof(float**) * 100);
+    //initializeRandomArray(100, 3, test_input);
+    //printf("Test inputs\n");
+    //printMatrix(test_input, 100, 3);
+    //float** test_weights;
+    //printf("Test weights\n");
+    //test_weights = (float**)malloc(sizeof(float**)*3);
+    //initializeRandomArray(3, 5, test_weights);
+    //printMatrix(test_weights, 3, 5);
+    //float** test_output;
+    //test_output = (float**)malloc(sizeof(float**) * 100);
+    //for (int i = 0; i < 100; i++) {
+    //    test_output[i] = (float*)malloc(sizeof(float) * 5);
+    //    for (int j = 0; j < 5; j++) {
+    //        test_output[i][j] = 0.0;
+    //    }
+    //    test_output[i][i % 4] = 1.0;
+    //}
+    //float** product;
+    //product = (float**)malloc(sizeof(float**) * 100);
+    //for (int i = 0; i < epochs; i++) {
+    //    printf("Epoch %d\n", i+1);
+    //    dotProduct(100, 3, 3, 5, test_input, test_weights, product, false);
+    //    printMatrix(product, 100, 5);
+    //    softmax(product, 100, 5);
+    //    printf("Product after softmax\n");
+    //    printMatrix(product, 100, 5);
+    //    printMatrix(test_output, 100, 5);
+    //    float accuracy = computeAccuracy(test_output, 100, 5, product);
+    //    printf("Accuracy: %f%%\n", accuracy * 100);
+    //    matrixSubtract(product, test_output, 100, 5, 100, 5, -1);
+    //    printf("Product after getting the loss:\n");
+    //    printMatrix(product, 100, 5);
+    //    float loss = crossEntropyLoss(product, 100, 5);
+    //    printf("Loss: %f\n", loss);
+    //    float** updated_weights;
+    //    updated_weights = (float**)malloc(sizeof(float**) * width * height);
+    //    dotProduct(100, 3, 100, 5, test_input, product, updated_weights, true);
+    //    printf("Update:\n");
+    //    printMatrix(updated_weights, 3, 5);
+    //    multiplyMatrixByScalar(updated_weights, 3, 5, learning_rate);
+    //    printf("New\n");
+    //    printMatrix(updated_weights, 3, 5);
+    //    matrixSubtract(test_weights, updated_weights, 3, 5, 3, 5, 1);
+    //    printMatrix(test_weights, 3, 5);
+    //}
     float **weights;
     weights = (float**)malloc(sizeof(float**)*width*height);
     initializeRandomArray(width*height, 10, weights);
-    //test dotProduct function
-    // float matrix[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
-    // float vector[3][1] = {{1.0}, {2.0}, {3.0}};
-    // printf("%f", matrix[2][2]);
-    //the resulting matrix should be a 3x1 matrix with the values
-    /*  [1.0]
-        [2.0]
-        [3.0]
-    */
     float** product;
-    product = (float**)malloc(sizeof(float**)*size);
-    dotProduct(size, width * height, width * height, 10, input, weights, product);
-    //printMatrix(product, 10, size);
-    // dotProduct(3, 3, 3, 1, matrix, vector, product);
-    // dotProduct(size, wid)
-    //printf("End of execution\n");
-    softmax(product, 10, 10);
+    product = (float**)malloc(sizeof(float**) * size);
+    for (int i = 0; i < epochs; i++) {
+        printf("Compute initial product\n");
+        dotProduct(BATCH_SIZE, width * height, width * height, 10, input, weights, product, false);
+        //printMatrix(product, BATCH_SIZE, 10);
+        // dotProduct(3, 3, 3, 1, matrix, vector, product);
+        // dotProduct(size, wid)
+        softmax(product, BATCH_SIZE, 10);
+        //printf("Results after softmax\n");
+        //printMatrix(product, BATCH_SIZE, 10);
+        //printf("Ground truth\n");
+        //printMatrix(output, BATCH_SIZE, 10);
+        float accuracy = computeAccuracy(output, BATCH_SIZE, 10, product);
+        printf("Accuracy: %f%%\n", accuracy * 100);
+        matrixSubtract(product, output, BATCH_SIZE, 10, BATCH_SIZE, 10, -1);
+        //printf("Product after getting the loss:\n");
+        //printMatrix(product, BATCH_SIZE, 10);
+        float loss = crossEntropyLoss(product, BATCH_SIZE, 10);
+        printf("Loss: %f\n", loss);
+        float** updated_weights;
+        updated_weights = (float**)malloc(sizeof(float**) * width * height);
+        dotProduct(BATCH_SIZE, width * height, BATCH_SIZE, 10, input, product, updated_weights, true);
+        //printf("Updated weights\n");
+        //printMatrix(updated_weights, width * height, 10);
+        multiplyMatrixByScalar(updated_weights, width * height, 10, learning_rate);
+        //printf("Original weights\n");
+        //printMatrix(weights, width*height, 10);
+        matrixAdd(weights, updated_weights, width * height, 10, width * height, 10);
+        //printf("weights after update\n");
+        //printmatrix(weights, width*height, 10);
+        printf("End of epoch %d\n", i + 1);
+    }
     return 0;
 }
