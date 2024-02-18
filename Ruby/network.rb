@@ -63,6 +63,7 @@ def computeAccuracy(predicted, actual)
     end
 return total
 end
+
 def printMatrix(matrix)
     (0..matrix.length-1).each do |i|
         string = ""
@@ -106,6 +107,28 @@ def normalizeInputs(inputs)
     end
 end
 
+def crossEntropyLoss(matrix)
+    sum = 0
+    matrix.each do |row|
+        row.each do |col|
+            if col != 0
+                sum -= Math.log(col.abs)
+            end
+        end
+    end
+return sum
+end
+
+def transpose(matrix)
+    mat_trans = Array.new(matrix[0].length) {Array.new(matrix.length, 0.0)}
+    (0..matrix[0].length-1).each do |i|
+        (0..matrix.length-1).each do |j|
+            mat_trans[i][j] = matrix[j][i]
+        end
+    end
+return mat_trans
+end
+
 def main
     puts "Hello World!";
     size = 60000
@@ -142,9 +165,15 @@ def main
             num_correct += computeAccuracy(inputs[index..index+batch_size], outputs[index..index+batch_size])
             accuracy = num_correct.to_f / (index+batch_size).to_f
             puts "Accuracy: " + accuracy.to_s
-            index += batch_size
             product = matrixSubtract(output_one_hot[index..index+batch_size], product)
             printMatrix(product)
+            loss = crossEntropyLoss(product)
+            puts "Loss: " + loss.to_s
+            updated_weights = dotProduct(transpose(inputs[index..index+batch_size]), product)
+            puts updated_weights.length
+            puts updated_weights[0].length
+            printMatrix(updated_weights)
+            index += batch_size
             break
         end
     end
