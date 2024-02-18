@@ -306,6 +306,9 @@ int main(void) {
     output = (float**)malloc(sizeof(float**) * size);
     for (int i = 0; i < size; i++) {
         output[i] = (float *)malloc(10*sizeof(float));
+        for(int j = 0; j < 10; j++) {
+            output[i][j] = 0;
+        }
         output[i][labels[i]]++;
     }
     float **weights;
@@ -329,7 +332,8 @@ int main(void) {
             totalCorrect += computeCorrect(output + (j), BATCH_SIZE, 10, product);
             accuracy = totalCorrect/ (j + BATCH_SIZE);
             printf("accuracy: %f%%\n", accuracy * 100);
-            matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, -1);
+            printMatrix(output + j, BATCH_SIZE, 10);
+            matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, 1);
             printMatrix(product, BATCH_SIZE, 10);
             // float loss = crossEntropyLoss(product, BATCH_SIZE, 10);
             // printf("loss: %f\n", loss);
