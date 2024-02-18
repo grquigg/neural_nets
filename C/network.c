@@ -139,12 +139,7 @@ void matrixSubtract(float ** matrix1, float **matrix2, float m1_h, float m1_w, f
         for (int i = 0; i < m1_h; i++) {
             for (int j = 0; j < m1_w; j++) {
                 matrix1[i][j]-=matrix2[i][j];
-                if(matrix1[i][j] < OVERFLOW_FLAG) {
-                    matrix1[i][j] = 0;
-                }
-                else {
-                    matrix1[i][j] *= scalar;
-                }
+                matrix1[i][j] *= scalar;
             }
         }
     }
@@ -172,7 +167,6 @@ float crossEntropyLoss(float** loss, int matrix_height, int matrix_width) {
     for (int i = 0; i < matrix_height; i++) {
         for (int j = 0; j < matrix_width; j++) {
             if (loss[i][j] != 0) {
-                printf("%f %f\n", log_sum, fabsf(loss[i][j]));
                 log_sum -= logf(fabsf(loss[i][j]));
             }
         }
@@ -258,6 +252,19 @@ void testFunctions(float learning_rate, int epochs) {
         printMatrix(test_weights, 3, 5);
     }
 }
+
+float** transposeMatrix(float ** matrix, int matrix_height, int matrix_width) {
+    float **transpose;
+    transpose = (float**) malloc(sizeof(float**) * matrix_width);
+    for(int i = 0; i < matrix_width; i++) {
+        transpose[i] = (float*)malloc(sizeof(float) * matrix_height);
+        for(int j = 0; j < matrix_height; j++) {
+            transpose[i][j] = matrix[j][i];
+        }
+    }
+    return transpose;
+}
+
 int main(void) {
     FILE *fptr;
     char train_data_path[] = "../mnist/train-images.idx3-ubyte";
@@ -332,18 +339,18 @@ int main(void) {
             totalCorrect += computeCorrect(output + (j), BATCH_SIZE, 10, product);
             accuracy = totalCorrect/ (j + BATCH_SIZE);
             printf("accuracy: %f%%\n", accuracy * 100);
-            printMatrix(output + j, BATCH_SIZE, 10);
-            matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, 1);
+            matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, -1);
             printMatrix(product, BATCH_SIZE, 10);
-            // float loss = crossEntropyLoss(product, BATCH_SIZE, 10);
-            // printf("loss: %f\n", loss);
-            // float** updated_weights;
-            // updated_weights = (float**)malloc(sizeof(float**) * width * height);
-            // //printf("Reverse dot product\n");
-            // //printMatrix(product, BATCH_SIZE, 10);
-            // dotProduct(BATCH_SIZE, width * height, BATCH_SIZE, 10, input+j, product, updated_weights, true);
+            float loss = crossEntropyLoss(product, BATCH_SIZE, 10);
+            printf("loss: %f\n", loss);
+            float** updated_weights;
+            updated_weights = (float**)malloc(sizeof(float**) * width * height);
+            //printf("Reverse dot product\n");
+            //printMatrix(product, BATCH_SIZE, 10);
+            dotProduct(width * height, BATCH_SIZE, BATCH_SIZE, 10, transposeMatrix(input+j, BATCH_SIZE, width*height), product, updated_weights, false);
+            printMatrix(updated_weights, width*height, 10);
             // //printf("Weight updates\n");
-            // multiplyMatrixByScalar(updated_weights, width * height, 10, learning_rate);
+            multiplyMatrixByScalar(updated_weights, width * height, 10, learning_rate);
             // matrixAdd(weights, updated_weights, width * height, 10, width * height, 10);
             //printMatrix(weights, width * height, 10);
         }
