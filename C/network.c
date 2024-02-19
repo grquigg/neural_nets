@@ -54,7 +54,7 @@ float crossEntropyLoss(float** loss, int matrix_height, int matrix_width, float 
     for (int i = 0; i < matrix_height; i++) {
         for (int j = 0; j < matrix_width; j++) {
             if (loss[i][j] != 0.0) {
-                log_sum -= (groundTruth[i][j] * logf(fabsf(loss[i][j])));
+                log_sum -= logf(fabsf(loss[i][j]));
             }
         }
     }
@@ -100,68 +100,65 @@ void assert(bool condition) {
     }
 }
 
-void testFunctions(float learning_rate, int epochs) {
-//    EXAMPLES FOR TESTING
-    float** test_input;
-    int test_height = 4;
-    int test_features = 4;
-    int test_classes = 5;
-    test_input = (float**)malloc(sizeof(float**) * test_height);
-    initializeRandomArray(test_height, test_features, test_input);
-    printf("Test inputs\n");
-    printMatrix(test_input, test_height, test_features);
-    float** test_weights;
-    // printf("Test weights\n");
-    test_weights = (float**)malloc(sizeof(float**)*test_features);
-    initializeRandomArray(test_features, test_classes, test_weights);
-    printf("Original weights\n");
-    printMatrix(test_weights, test_features, test_classes);
-    float** test_output;
-    test_output = (float**)malloc(sizeof(float**) * test_height);
-    for (int i = 0; i < test_height; i++) {
-        test_output[i] = (float*)malloc(sizeof(float) * test_classes);
-        for (int j = 0; j < test_classes; j++) {
-            test_output[i][j] = 0.0;
-        }
-        test_output[i][i % test_classes] = 1.0;
-    }
-    printMatrix(test_output, test_height, test_classes);
-    float** product;
-    product = (float**)malloc(sizeof(float**) * test_features);
-    for (int i = 0; i < epochs; i++) {
-        printf("Epoch %d\n", i+1);
-        dotProduct(test_height, test_features, test_features, test_classes, test_input, test_weights, product);
-        printf("Product before softmax\n");
-        softmax(product, test_height, test_classes);
-        printf("Actual\n");
-        printMatrix(product, test_height, test_classes);
-        printf("Expected\n");
-        printMatrix(test_output, test_height, test_classes);
-        int correct = computeCorrect(test_output, test_height, test_classes, product);
-        float accuracy = correct / (float) test_height;
-        printf("Accuracy: %f%%\n", accuracy * 100);
-        //actual - expected
-        matrixSubtract(product, test_output, test_height, test_classes, test_height, test_classes, -1);
-        printMatrix(product, test_height, test_classes);
-        printf("Product after getting the loss:\n");
-        float loss = crossEntropyLoss(product, test_height, test_classes, test_output);
-        printf("Loss: %f\n", loss);
-        //and here's the part where we update only relevant weights
-        //assert that the dimensions are equal
-        
-        float** updated_weights;
-        updated_weights = (float**)malloc(sizeof(float**) * 3*5);
-        dotProduct(test_features, test_height, test_height, test_classes, transposeMatrix(test_input, test_height, test_features), product, updated_weights);
-        printf("Update:\n");
-        printMatrix(updated_weights, test_features, test_classes);
-        multiplyMatrixByScalar(updated_weights, test_features, test_classes, learning_rate);
-        printf("New\n");
-        matrixSubtract(test_weights, updated_weights, test_features, test_classes, test_features, test_classes, 1);
-        // matrixAdd(test_weights, updated_weights, 3, 5, 3, 5);
-        printf("Weights after update:\n");
-        printMatrix(test_weights, test_features, test_classes);
-    }
-}
+// void testFunctions(float learning_rate, int epochs) {
+// //    EXAMPLES FOR TESTING
+//     float** test_input;
+//     int test_height = 4;
+//     int test_features = 4;
+//     int test_classes = 5;
+//     test_input = (float**)malloc(sizeof(float**) * test_height);
+//     initializeRandomArray(test_height, test_features, test_input);
+//     printf("Test inputs\n");
+//     printMatrix(test_input, test_height, test_features);
+//     float** test_weights;
+//     // printf("Test weights\n");
+//     test_weights = (float**)malloc(sizeof(float**)*test_features);
+//     initializeRandomArray(test_features, test_classes, test_weights);
+//     printf("Original weights\n");
+//     printMatrix(test_weights, test_features, test_classes);
+//     float** test_output;
+//     test_output = (float**)malloc(sizeof(float**) * test_height);
+//     for (int i = 0; i < test_height; i++) {
+//         test_output[i] = (float*)malloc(sizeof(float) * test_classes);
+//         for (int j = 0; j < test_classes; j++) {
+//             test_output[i][j] = 0.0;
+//         }
+//         test_output[i][i % test_classes] = 1.0;
+//     }
+//     printMatrix(test_output, test_height, test_classes);
+//     float** product;
+//     product = (float**)malloc(sizeof(float**) * test_features);
+//     for (int i = 0; i < epochs; i++) {
+//         printf("Epoch %d\n", i+1);
+//         dotProduct(test_height, test_features, test_features, test_classes, test_input, test_weights, product);
+//         softmax(product, test_height, test_classes);
+//         printf("Actual\n");
+//         printMatrix(product, test_height, test_classes);
+//         int correct = computeCorrect(test_output, test_height, test_classes, product);
+//         float accuracy = correct / (float) test_height;
+//         printf("Accuracy: %f%%\n", accuracy * 100);
+//         //actual - expected
+//         matrixSubtract(product, test_output, test_height, test_classes, test_height, test_classes, -1);
+//         printf("Actual - expected\n");
+//         printMatrix(product, test_height, test_classes);
+//         float loss = crossEntropyLoss(product, test_height, test_classes, test_output);
+//         printf("\nLoss: %f\n", loss);
+//         //and here's the part where we update only relevant weights
+//         //assert that the dimensions are equal
+//         // matrixMultiply(product, test_output, test_height, test_classes);
+//         // printMatrix(product, test_height, test_classes);
+//         float** updated_weights;
+//         updated_weights = (float**)malloc(sizeof(float**) * test_height);
+//         dotProduct(test_features, test_height, test_height, test_classes, transposeMatrix(test_input, test_height, test_features), product, updated_weights);
+//         printf("Update:\n");
+//         printMatrix(updated_weights, test_features, test_classes);
+//         multiplyMatrixByScalar(updated_weights, test_features, test_classes, learning_rate);
+//         // matrixSubtract(test_weights, updated_weights, test_features, test_classes, test_features, test_classes, 1);
+//         matrixAdd(test_weights, updated_weights, test_features, test_classes, test_features, test_classes);
+//         printf("Weights after update:\n");
+//         printMatrix(test_weights, test_features, test_classes);
+//     }
+// }
 
 int main(void) {
     srand(1);
@@ -220,47 +217,40 @@ int main(void) {
     float **weights;
     weights = (float**)malloc(sizeof(float**)*width*height);
     initializeRandomArray(width*height, 10, weights);
-    testFunctions(learning_rate, epochs);
-    // float** product;
-    // product = (float**)malloc(sizeof(float**) * BATCH_SIZE);
-    // for (int i = 0; i < epochs; i++) {
-    //     float accuracy = 0.0;
-    //     int totalCorrect = 0;
-    //     for (int j = 0; j < BATCH_SIZE; j += BATCH_SIZE) {
-    //         //forward pass
-    //         // printf("Batch starting at %d\n", j);
-    //         dotProduct(BATCH_SIZE, width * height, width * height, 10, input+j, weights, product);
-    //         // printMatrix(product, BATCH_SIZE, 10);
-    //         softmax(product, BATCH_SIZE, 10);
-    //         printf("Predicted\n");
-    //         printMatrix(product, 10, 10);
-    //         printf("Actual\n");
-    //         printMatrix(output + (j), 10, 10);
-    //         // printf("New product\n");
-    //         // printMatrix(product, BATCH_SIZE, 10);
-    //         //calculate accuracy
-    //         totalCorrect += computeCorrect(output + (j), BATCH_SIZE, 10, product);
-    //         accuracy = totalCorrect/ (j + BATCH_SIZE);
-    //         matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, 1);
-    //         // printf("Matrix\n");
-    //         // printMatrix(product, BATCH_SIZE, 10);
-    //         float loss = crossEntropyLoss(product, BATCH_SIZE, 10, output+j);
-    //         printf("loss: %f\n", loss);
-    //         float** updated_weights;
-    //         updated_weights = (float**)malloc(sizeof(float**) * width * height);
-    //         //printf("Reverse dot product\n");
-    //         // printMatrix(product, BATCH_SIZE, 10);
-    //         dotProduct(width * height, BATCH_SIZE, BATCH_SIZE, 10, transposeMatrix(input+j, BATCH_SIZE, width*height), product, updated_weights);
-    //         // //printf("Weight updates\n");
-    //         multiplyMatrixByScalar(updated_weights, width * height, 10, learning_rate);
-    //         // printf("Updated weights\n");
-    //         // printMatrix(updated_weights, BATCH_SIZE, 10);
-    //         matrixSubtract(weights, updated_weights, width * height, 10, width * height, 10, 1);
-    //         // printf("Weights\n");
-    //         // printMatrix(weights, BATCH_SIZE, 10);
-    //     }
-    //     printf("end of epoch %d\n", i + 1);
-    //     printf("accuracy: %f%%\n", accuracy * 100);
-    // }
+    // testFunctions(learning_rate, epochs);
+    float** product;
+    product = (float**)malloc(sizeof(float**) * BATCH_SIZE);
+    for (int i = 0; i < epochs; i++) {
+        float accuracy = 0.0;
+        int totalCorrect = 0;
+        for (int j = 0; j < size; j += BATCH_SIZE) {
+            //forward pass
+            // printf("Batch starting at %d\n", j);
+            dotProduct(BATCH_SIZE, width * height, width * height, 10, input+j, weights, product);
+            // printMatrix(product, BATCH_SIZE, 10);
+            softmax(product, BATCH_SIZE, 10);
+            // printf("Predicted\n");
+            // printMatrix(product, BATCH_SIZE, 10);
+            // // printf("Actual\n");
+            // printMatrix(output + (j), BATCH_SIZE, 10);
+            // printf("New product\n");
+            // printMatrix(product, BATCH_SIZE, 10);
+            //calculate accuracy
+            totalCorrect += computeCorrect(output + (j), BATCH_SIZE, 10, product);
+            accuracy = totalCorrect/ (float) (j + BATCH_SIZE);
+            matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, -1);
+            // printf("Matrix\n");
+            // printMatrix(product, BATCH_SIZE, 10);
+            float loss = crossEntropyLoss(product, BATCH_SIZE, 10, output+j);
+            // printf("loss: %f\n", loss);
+            float** updated_weights;
+            updated_weights = (float**)malloc(sizeof(float**) * width * height);
+            dotProduct(width * height, BATCH_SIZE, BATCH_SIZE, 10, transposeMatrix(input+j, BATCH_SIZE, width*height), product, updated_weights);
+            multiplyMatrixByScalar(updated_weights, width * height, 10, learning_rate*(1.0/(float) BATCH_SIZE));
+            matrixAdd(weights, updated_weights, width * height, 10, width * height, 10);
+        }
+        printf("end of epoch %d\n", i + 1);
+        printf("accuracy: %f%%\n", accuracy * 100);
+    }
     return 0;
 }
