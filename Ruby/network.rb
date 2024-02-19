@@ -57,7 +57,10 @@ def computeAccuracy(predicted, actual)
                 max_index = j
             end
         end
+        # puts "predicted " + max_index.to_s
+        # puts actual[i]
         if actual[i] == max_index
+            # puts "Agreed"
             total += 1
         end
     end
@@ -129,12 +132,15 @@ def transpose(matrix)
 return mat_trans
 end
 
+def multiplyMatrixByScalar(matrix, scalar)
+    (0..matrix.length-1).each {|i| (0..matrix[i].length-1).each {|j| matrix[i][j] *= scalar}}
+end
 def main
     puts "Hello World!";
     size = 60000
     width = 28
     height = 28
-    epochs = 1
+    epochs = 10
     learning_rate = 0.005
     batch_size = 1000
     input_path = "../mnist/train-images.idx3-ubyte"
@@ -152,7 +158,7 @@ def main
         output_one_hot[index][outputs[index]] += 1
         index += 1
     end
-    weights = Array.new(width*height) {Array.new(10, 1.0)}
+    weights = initializeRandomWeights(height*width, 10)
     # printMatrix(weights)
     (1..epochs).each do |i|
         index = 0
@@ -160,22 +166,18 @@ def main
         while index < size do
             product = dotProduct(inputs[index..index+batch_size], weights)
             softmax(product)
-            puts "New product"
-            printMatrix(product)
-            num_correct += computeAccuracy(inputs[index..index+batch_size], outputs[index..index+batch_size])
+            num_correct += computeAccuracy(product, outputs[index..index+batch_size])
             accuracy = num_correct.to_f / (index+batch_size).to_f
-            puts "Accuracy: " + accuracy.to_s
             product = matrixSubtract(output_one_hot[index..index+batch_size], product)
-            printMatrix(product)
             loss = crossEntropyLoss(product)
-            puts "Loss: " + loss.to_s
+            # puts "Loss: " + loss.to_s
             updated_weights = dotProduct(transpose(inputs[index..index+batch_size]), product)
-            puts updated_weights.length
-            puts updated_weights[0].length
-            printMatrix(updated_weights)
+            multiplyMatrixByScalar(updated_weights, learning_rate*(1/batch_size.to_f).to_f)
+            (0..weights.length-1).each {|i| (0..weights[i].length-1).each {|j| weights[i][j] += updated_weights[i][j]}}
             index += batch_size
-            break
         end
+        puts "End of epoch"
+        puts "Accuracy: " + (accuracy*100).to_s
     end
 end
 
