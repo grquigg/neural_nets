@@ -167,8 +167,8 @@ int main(void) {
     char train_labels_path[] = "../mnist/train-labels.idx1-ubyte";
     fptr = fopen(train_data_path, "rb");
     unsigned int vals[4];
-    float learning_rate = 0.001;
-    int epochs = 10;
+    float learning_rate = 0.005;
+    int epochs = 100;
     //the values are definitely stored as big endian
     int count = fread(vals,4,4, fptr);
     // Print the file content
@@ -225,25 +225,17 @@ int main(void) {
         int totalCorrect = 0;
         for (int j = 0; j < size; j += BATCH_SIZE) {
             //forward pass
-            // printf("Batch starting at %d\n", j);
             dotProduct(BATCH_SIZE, width * height, width * height, 10, input+j, weights, product);
-            // printMatrix(product, BATCH_SIZE, 10);
             softmax(product, BATCH_SIZE, 10);
-            // printf("Predicted\n");
-            // printMatrix(product, BATCH_SIZE, 10);
-            // // printf("Actual\n");
-            // printMatrix(output + (j), BATCH_SIZE, 10);
-            // printf("New product\n");
-            // printMatrix(product, BATCH_SIZE, 10);
             //calculate accuracy
             totalCorrect += computeCorrect(output + (j), BATCH_SIZE, 10, product);
             accuracy = totalCorrect/ (float) (j + BATCH_SIZE);
             matrixSubtract(product, output + (j), BATCH_SIZE, 10, BATCH_SIZE, 10, -1);
-            // printf("Matrix\n");
-            // printMatrix(product, BATCH_SIZE, 10);
+
             float loss = crossEntropyLoss(product, BATCH_SIZE, 10, output+j);
-            // printf("loss: %f\n", loss);
             float** updated_weights;
+
+            //backprop
             updated_weights = (float**)malloc(sizeof(float**) * width * height);
             dotProduct(width * height, BATCH_SIZE, BATCH_SIZE, 10, transposeMatrix(input+j, BATCH_SIZE, width*height), product, updated_weights);
             multiplyMatrixByScalar(updated_weights, width * height, 10, learning_rate*(1.0/(float) BATCH_SIZE));
