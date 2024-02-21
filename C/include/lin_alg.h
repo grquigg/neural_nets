@@ -11,6 +11,7 @@ void matrixSubtract(float ** matrix1, float **matrix2, float m1_h, float m1_w, f
 
 void matrixMultiply(float **mat1, float **mat2, float height, float width);
 
+__global__
 void dotProduct(int weight_h, int weight_w, int vector_h, int vector_w, float ** weights, float ** vectors, float ** product);
 
 #endif

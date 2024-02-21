@@ -60,17 +60,6 @@ float crossEntropyLoss(float** loss, int matrix_height, int matrix_width, float 
     }
     return log_sum;
 }
-void printMatrix(float ** matrix, int mat_height, int mat_width) {
-    // printf("[");
-    for(int i = 0; i < mat_height; i++) {
-        // printf("[");
-        for(int j = 0; j < mat_width; j++) {
-            printf("%f\t", matrix[i][j]);
-        }
-        printf("\n");
-    }
-    // printf("]\n");
-}
 
 int computeCorrect(float** output, int output_h, int output_w, float** predicted) {
     int correct = 0;
@@ -163,8 +152,8 @@ void assert(bool condition) {
 int main(void) {
     srand(1);
     FILE *fptr;
-    char train_data_path[] = "../mnist/train-images.idx3-ubyte";
-    char train_labels_path[] = "../mnist/train-labels.idx1-ubyte";
+    char train_data_path[] = "../MNIST_ORG/train-images.idx3-ubyte";
+    char train_labels_path[] = "../MNIST_ORG/train-labels.idx1-ubyte";
     fptr = fopen(train_data_path, "rb");
     unsigned int vals[4];
     float learning_rate = 0.005;
@@ -195,8 +184,6 @@ int main(void) {
     ////we will most likely need an array of float pointers for this in order to do the math quickly
     float **input;
     input = (float**) malloc(sizeof(float**) * size);
-    //
-    //printf("This is a test\n");
     for(int i = 0; i < size; i++) {
         input[i] = (float*)malloc(sizeof(float) * width * height);
         for(int j = 0; j < width*height; j++) {
