@@ -63,7 +63,7 @@ int main(void) {
     int height = vals[3];
 
     //establish the number of thread blocks (also called n_workers) and the number of threads per block
-    int n_workers = 100;
+    int n_workers = 1000;
     int n_threads_per_block = 1;
     
     //read in all of the data at once using mall
