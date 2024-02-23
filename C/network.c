@@ -89,6 +89,20 @@ void assert(bool condition) {
     }
 }
 
+
+void printMatrix(float ** matrix, int mat_height, int mat_width) {
+    // printf("[");
+    for(int i = 0; i < mat_height; i++) {
+        // printf("[");
+        for(int j = 0; j < mat_width; j++) {
+            printf("%f\t", matrix[i][j]);
+        }
+        printf("\n");
+    }
+    // printf("]\n");
+}
+
+
 // void testFunctions(float learning_rate, int epochs) {
 // //    EXAMPLES FOR TESTING
 //     float** test_input;
@@ -157,7 +171,7 @@ int main(void) {
     fptr = fopen(train_data_path, "rb");
     unsigned int vals[4];
     float learning_rate = 0.005;
-    int epochs = 100;
+    int epochs = 1;
     //the values are definitely stored as big endian
     int count = fread(vals,4,4, fptr);
     // Print the file content
@@ -173,10 +187,10 @@ int main(void) {
     count = fread(data, sizeof(unsigned char), vals[1] * vals[2] * vals[3], fptr);
     fclose(fptr);
     //and now to try to open the training labels
-    printf("outputs\n");
     unsigned char* labels = openUByte(train_labels_path);
 
-    int BATCH_SIZE = 1000;
+    int BATCH_SIZE = 60;
+    printf("BATCH SIZE: %d\n", BATCH_SIZE);
     //all of the data is stored! the next thing that needs to be done is to convert the image data and
     //the label data into floats and ints, respectively
     //we're not going to have negative pixel values but we still need the precision for the linear algebra that we're
@@ -211,8 +225,10 @@ int main(void) {
         float accuracy = 0.0;
         int totalCorrect = 0;
         for (int j = 0; j < size; j += BATCH_SIZE) {
+            printf("Batch %d\n", j/BATCH_SIZE);
             //forward pass
             dotProduct(BATCH_SIZE, width * height, width * height, 10, input+j, weights, product);
+            printMatrix(product, BATCH_SIZE, 10);
             softmax(product, BATCH_SIZE, 10);
             //calculate accuracy
             totalCorrect += computeCorrect(output + (j), BATCH_SIZE, 10, product);

@@ -1,15 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-
-
-__global__
-void normalize(float *input, int row_size) {
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    printf("Valid\n");
-    for(int index = 0; index < row_size; index++) {
-        input[i*row_size + index] = 1.0;
-    }
-}
+#include "include/lin_alg_gpu.h"
+#include <time.h>
 
 unsigned char * openUByte(char * path) {
     FILE *ptr;
@@ -47,6 +39,7 @@ void initializeRandomArray(int height, int width, float ** weights) {
         }
     }
 }
+
 float* transferMatrixToDevice(float **matrix, int height, int width) {
     float* deviceMatrix;
     cudaMalloc(&deviceMatrix, height*width*sizeof(float));
@@ -60,13 +53,6 @@ void transferMatrixToHost(float* deviceMatrix, float** hostMatrix, int height, i
     for(int i = 0; i < height; i++) {
         cudaMemcpy(hostMatrix[i], deviceMatrix+(i*width), sizeof(float)*width, cudaMemcpyHostToDevice);
     }
-}
-
-__global__
-void forward_pass(int BATCH_SIZE, float* inputs, float* weights, float* outputs, int size, int n_features, int n_classes) {
-    //the dot product has been modified to account for the fact that we're passing 1D arrays
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    printf("%d\n", i);
 }
 
 int main(void) {
@@ -93,8 +79,8 @@ int main(void) {
     int height = vals[3];
 
     //establish the number of thread blocks (also called n_workers) and the number of threads per block
-    int n_workers = 500;
-    int n_threads_per_block = 2;
+    int n_workers = 100;
+    int n_threads_per_block = 10;
     BATCH_SIZE = size / (n_threads_per_block*n_workers);
     printf("BATCH SIZE: %d\n", BATCH_SIZE);
     //read in all of the data at once using mall
@@ -107,6 +93,7 @@ int main(void) {
 
     //allocate everything in CPU and GPU memory
     //initialize input array in CPU memory and GPU memory
+    time_t start_time = time(NULL);
     float **input;
     input = (float**) malloc(sizeof(float*) * size * width * height);
     for(int i = 0; i < size; i++) {
@@ -120,13 +107,23 @@ int main(void) {
 
     //initialize weight array in CPU and GPU memory
     float **weights;
-    weights = (float**)malloc(sizeof(float**)*width*height);
+    weights = (float**)malloc(sizeof(float*)*width*height);
     initializeRandomArray(width*height, 10, weights);
-    float *d_weights = transferMatrixToDevice(weights, width*height, 10);
+    float *d_gradients;
+    cudaMalloc(&d_gradients, n_threads_per_block*n_workers*width*height*10*sizeof(float));
+
+    for(int i = 0; i < n_threads_per_block*n_workers; i++) {
+        for(int j = 0; j < height; j++) {
+            cudaMemcpy(d_gradients+(i+height*width)+(j*width), weights[j], sizeof(float)*width, cudaMemcpyHostToDevice);
+        }
+    }
+
+    float *d_weights;
+    d_weights = transferMatrixToDevice(weights, width*height, 10);
 
     //since the output one hot vectors are directly related to computing the gradients, we should pass them to the GPU as well
     float ** output;
-    output = (float**)malloc(sizeof(float**) * size);
+    output = (float**)malloc(sizeof(float*) * size);
     for (int i = 0; i < size; i++) {
         output[i] = (float *)malloc(10*sizeof(float));
         for(int j = 0; j < 10; j++) {
@@ -135,9 +132,24 @@ int main(void) {
         output[i][labels[i]] = 1.0;
     }
     float *d_outputs = transferMatrixToDevice(output, size, 10);
-    // normalize<<<n_workers, n_threads_per_block>>>(d_input, width*height);
-    forward_pass<<<n_workers, n_threads_per_block>>>(BATCH_SIZE, d_input, d_weights, d_outputs, size, width*height, 10);
-    printf("DONE\n");
+    time_t end_time = time(NULL);
+    double diff = difftime(end_time, start_time);
+    time_t start_train_time = time(NULL);
+    int * counter = 0;
+    cudaMemcpy(&counter, 0, sizeof(int), cudaMemcpyHostToDevice);
+    // printf("Finished memory allocation in %f seconds\n", diff);
+    // //forward pass
+    forward_pass<<<n_workers, n_threads_per_block>>>(BATCH_SIZE, d_input, d_weights, d_outputs, d_gradients, size, width*height, 10, counter);
+    cudaDeviceSynchronize();
+    // time_t end_train_time = time(NULL);
+    // diff = difftime(end_train_time, start_train_time);
+    // printf("Finished forward pass in %f seconds\n", diff);
+    //pass weights back to CPU and verify correctness
+    for(int i = 0; i < n_threads_per_block*n_workers; i++) {
+        transferMatrixToHost(d_gradients+(i+height*width), weights, width*height, 10);
+        printf("Batch %d\n", i);
+        printMatrix(weights, BATCH_SIZE, 10);
+    }
     //Before we start training, we need to
     //allocate n_workers copies of the weight matrix to each different thread
 
@@ -148,7 +160,9 @@ int main(void) {
     */
     cudaFree(d_input);
   	cudaFree(d_outputs);
-  	// free(x);
-  	// free(y);
+    cudaFree(d_weights);
+    cudaFree(d_gradients);
+    free(weights);
+    free(input);
     return 0;
 }
