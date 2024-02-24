@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "../include/utils.h"
 #include <vector>
 #include <iostream>
 #include <cassert>
@@ -15,12 +15,12 @@
 //     return d;
 // }
 
-std::vector<std::vector<float>> initializeRandomArray(int mat_height, int mat_width) {
-    std::vector<std::vector<float>> weights(mat_height, std::vector<float>(mat_width, 0.0));
+std::vector<float> initializeRandomArray(int mat_height, int mat_width) {
+    std::vector<float> weights(mat_height*mat_width, 0.0);
     int a = 1;
     for (int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
-            weights[i][j] = (float)rand()/(float)(RAND_MAX/a);
+            weights[i*mat_width+j] = (float)rand()/(float)(RAND_MAX/a);
             // weights[i][j] = 0.5;
             //the most important line in the entire program
         }
@@ -62,4 +62,22 @@ std::vector<std::vector<int>> readDataFromUByteFile(std::string filePath) {
         }
     }
     return arr;
+}
+
+void printMatrix(float * arr, int height, int width) {
+    for(int i = 0; i < height; i++) {
+        for(int j = 0; j < width; j++) {
+            std::cout << arr[i*width+j] << "\t";
+        }
+        std::cout << std::endl;
+    }
+}
+
+void printMatrix(std::vector<float> arr, int height, int width) {
+    for(int i = 0; i < height; i++) {
+        for(int j = 0; j < width; j++) {
+            std::cout << arr[i*width+j] << "\t";
+        }
+        std::cout << std::endl;
+    }
 }
