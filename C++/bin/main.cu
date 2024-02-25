@@ -5,7 +5,7 @@
 // #include "utils.h"
 #include "../include/utils.h"
 #include "../include/lin_alg.h"
-
+#include <chrono> 
 
 float* transferMatrixToDevice(float **matrix, int height, int width) {
     float* deviceMatrix;
@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
     std::string train_label_path = argv[2];
     std::string nWorkers_arg = argv[3];
     std::string nThreads_arg = argv[4];
+    auto startInitial = std::chrono::system_clock::now();
     std::vector<std::vector<int>> inputs = readDataFromUByteFile(train_data_path);
     int size = inputs.size();
     int nFeatures = inputs[0].size();
@@ -58,7 +59,6 @@ int main(int argc, char** argv) {
     }
     float *d_outputs = transferMatrixToDevice(output, size, 10);
 
-
     //declare device variables
     float *d_inputs;
     float *d_weights;
@@ -71,16 +71,32 @@ int main(int argc, char** argv) {
     cudaMemcpy(d_weights, weights.data(), nFeatures*numClasses*sizeof(float), cudaMemcpyHostToDevice);
     cudaMalloc(&d_product, size*numClasses*sizeof(float));
     cudaMemcpy(d_product, product.data(), size*numClasses*sizeof(float), cudaMemcpyHostToDevice);
-    // std::cout << (nFeatures*numClasses)/(nWorkers*nThreadsPerWorker) << std::endl;
+    auto endInitial = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = endInitial-startInitial;
+    std::cout << "Finished initial setup in " << elapsed_seconds.count() << " seconds" << std::endl;
+
+    //forward pass
+    std::cout << "Starting forward pass..." << std::endl;
+    auto initForward = std::chrono::system_clock::now();
     forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs, d_weights, d_outputs, d_product, d_gradients, BATCH_SIZE, nFeatures, numClasses);
     cudaDeviceSynchronize();
+    auto endForward = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_forward = endForward - initForward;
+    std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
+    std::cout << "Starting backward pass..." << std::endl;
+    auto initBackward = std::chrono::system_clock::now();
     ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_gradients, nWorkers*nThreadsPerWorker, nFeatures*numClasses, (nFeatures*numClasses)/(nWorkers*nThreadsPerWorker));
     cudaDeviceSynchronize();
+    backward_pass<<<1,1>>>(d_weights, d_gradients, BATCH_SIZE, learning_rate, nFeatures, numClasses);
+    cudaDeviceSynchronize();
+    auto endBackward = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_backward = endBackward - initBackward;
+    std::cout << "Finished forward pass in " << elapsed_backward.count() << " seconds" << std::endl;
     float *produce = (float*)malloc(size*numClasses*sizeof(float));
     cudaMemcpy(produce, d_product, size*numClasses*sizeof(float), cudaMemcpyDeviceToHost);
     float *gradients = (float*)malloc(nFeatures*numClasses*nWorkers*nThreadsPerWorker*sizeof(float));
     cudaMemcpy(gradients, d_gradients, nFeatures*numClasses*nWorkers*nThreadsPerWorker*sizeof(float), cudaMemcpyDeviceToHost);
-    printMatrix(gradients, nFeatures, numClasses);
+    // printMatrix(gradients, nFeatures, numClasses);
     // printMatrix(produce, size, numClasses);
     cudaFree(d_inputs);
     cudaFree(d_weights);
