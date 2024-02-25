@@ -20,8 +20,8 @@ std::vector<float> initializeRandomArray(int mat_height, int mat_width) {
     int a = 1;
     for (int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
-            weights[i*mat_width+j] = (float)rand()/(float)(RAND_MAX/a);
-            // weights[i][j] = 0.5;
+            // weights[i*mat_width+j] = (float)rand()/(float)(RAND_MAX/a);
+            weights[i*mat_width+j] = 0.25;
             //the most important line in the entire program
         }
     }
@@ -35,7 +35,6 @@ std::vector<std::vector<int>> readDataFromUByteFile(std::string filePath) {
     //first two bytes are zero, so we take the third byte and assert that it's eight
     int buffer_ptr = 0;
     int dims = buffer[3];
-    std::cout << dims << std::endl;
     std::vector<int> dimensions;
     for(int i = 0; i < dims; i++) {
         int d = buffer[4+(i*4)] << 24 | buffer[4+(i*4)+1] << 16 | buffer[4+(i*4)+2] << 8 | buffer[7+(i*4)];

@@ -18,15 +18,14 @@ float* transferMatrixToDevice(float **matrix, int height, int width) {
 
 int main(int argc, char** argv) {
     int numClasses = 10;
-    std::cout << "Hello World!" << std::endl;
-    std::cout << "Train data path: " << argv[1] << std::endl;
+    // std::cout << "Hello World!" << std::endl;
+    // std::cout << "Train data path: " << argv[1] << std::endl;
     if(argc != 3) {
         std::cout << "Need to specify paths for loading in the training data and the training labels" << std::endl;
         return 0;
     }
     std::string train_data_path = argv[1];
     std::string train_label_path = argv[2];
-    std::cout << "args" << std::endl;
     std::vector<std::vector<int>> inputs = readDataFromUByteFile(train_data_path);
     int size = inputs.size();
     int nFeatures = inputs[0].size();
@@ -37,14 +36,15 @@ int main(int argc, char** argv) {
             input[i*nFeatures + j] = (float) inputs[i][j] / 255.0;
         }
     }
+    // printMatrix(input, size, nFeatures);
     std::vector<std::vector<int>> outputs = readDataFromUByteFile(train_label_path);
     std::vector<float> weights = initializeRandomArray(nFeatures, numClasses);
     std::vector<float> product(size*nFeatures*10, 0.0);
     float learning_rate = 0.005;
-    int nWorkers = 4;
-    int nThreadsPerWorker = 2;
+    int nWorkers = 10;
+    int nThreadsPerWorker = 60;
     int BATCH_SIZE = size / (nWorkers * nThreadsPerWorker);
-
+    // std::cout << "BATCH SIZE " << BATCH_SIZE << std::endl;
     float ** output;
     output = (float**)malloc(sizeof(float*) * size);
     for (int i = 0; i < size; i++) {
@@ -61,18 +61,23 @@ int main(int argc, char** argv) {
     float *d_inputs;
     float *d_weights;
     float *d_product;
+    float *d_gradients;
+    cudaMalloc(&d_gradients, nFeatures*numClasses*nWorkers*nThreadsPerWorker*sizeof(float));
     cudaMalloc(&d_inputs, size*nFeatures*sizeof(float));
     cudaMemcpy(d_inputs, input.data(), size*nFeatures*sizeof(float), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, nFeatures*numClasses*sizeof(float));
     cudaMemcpy(d_weights, weights.data(), nFeatures*numClasses*sizeof(float), cudaMemcpyHostToDevice);
     cudaMalloc(&d_product, size*numClasses*sizeof(float));
     cudaMemcpy(d_product, product.data(), size*numClasses*sizeof(float), cudaMemcpyHostToDevice);
-    forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs, d_weights, d_outputs, d_product, BATCH_SIZE, nFeatures, numClasses);
+    forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs, d_weights, d_outputs, d_product, d_gradients, BATCH_SIZE, nFeatures, numClasses);
     cudaDeviceSynchronize();
 
     float *produce = (float*)malloc(size*numClasses*sizeof(float));
     cudaMemcpy(produce, d_product, size*numClasses*sizeof(float), cudaMemcpyDeviceToHost);
-    printMatrix(produce, size, numClasses);
+    float *gradients = (float*)malloc(nFeatures*numClasses*nWorkers*nThreadsPerWorker*sizeof(float));
+    cudaMemcpy(gradients, d_gradients, nFeatures*numClasses*nWorkers*nThreadsPerWorker*sizeof(float), cudaMemcpyDeviceToHost);
+    printMatrix(gradients, nFeatures*nWorkers*nThreadsPerWorker, numClasses);
+    // printMatrix(produce, size, numClasses);
     cudaFree(d_inputs);
     cudaFree(d_weights);
     cudaFree(d_product);
