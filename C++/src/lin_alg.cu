@@ -78,6 +78,26 @@ __device__ void matrixMultiplyByScalar(float* mat, int m1_h, int m1_w, float sca
     }
 }
 
+/////METRIC COMPUTATIONS/////
+__device__ int getAccuracy(float* predicted, float* actual, int height, int width) {
+    int correct = 0;
+    for (int i = 0; i < height; i++) {
+        int max = 0;
+        float max_score = 0.0;
+        int a = 0;
+        for (int j = 0; j < width; j++) {
+            if (predicted[(i*width)+j] > max_score) {
+                max = j;
+                max_score = predicted[(i*width)+j];
+            }
+            if (actual[(i*width)+j] == 1.0) {
+                a = j;
+            }
+        }
+        if ((int) a == max) correct++;
+    }
+    return correct;
+}
 
 //////////GLOBALS////////
 /*
@@ -106,11 +126,13 @@ __global__ void ringReduce(float* gradients, const int total_steps, const int st
     //and in the set loop, we're setting every copy of the gradients in our array to be equal to the most recently updated entry
 }
 
-__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes) {
+__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes, int* correct, float * loss) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     //BATCH_SIZE*n_classes length vector
     dotProduct(inputs+(i*size*n_features), weights, product+(i*size*n_classes), size, n_features, n_features, n_classes);
     softmax(product+(i*size*n_classes), size, n_classes);
+    (*correct) += getAccuracy(product+(i*size*n_classes), outputs+(i*size*n_classes), size, n_classes);
+    //we can compute accuracy on the forward pass
     matrixSubtract(product+(i*size*n_classes), outputs+(i*size*n_classes), size, n_classes, size, n_classes, -1);
     dotProductTranspose(inputs+(i*size*n_features), product+(i*size*n_classes), gradients+(i*n_features*n_classes), size, n_features, size, n_classes);
     //ring reduce
