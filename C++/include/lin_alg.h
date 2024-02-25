@@ -3,6 +3,12 @@
 
 #include <vector>
 
+/*
+The only issue that ringReduce might have in our current implementation is that we don't know how many steps we need to actually take
+However, we can leverage the fact that each thread has awareness of the global dimensions, so that's how many partitions we need to use
+*/
+__global__ void ringReduce(float * gradients, const int total_steps, const int step_size, const int chunk_size);
+
 __device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float scalar);
 
 __device__ void softmax(float* product, int product_height, int product_width);
