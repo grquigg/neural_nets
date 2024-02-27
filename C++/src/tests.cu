@@ -20,9 +20,9 @@ int main() {
     int test_size = 40;
     int n_features = 20;
     int out_classes = 5;
-    int nWorkers = 1;
-    int nThreadsPerWorker = 1;
-    float learning_rate = 0.001;
+    int nWorkers = 4;
+    int nThreadsPerWorker = 5;
+    float learning_rate = 0.01;
     int BATCH_SIZE = 20;
     int epochs = 100;
     float * inputs = (float *)malloc(n_features*test_size*sizeof(float));
@@ -65,14 +65,14 @@ int main() {
             cudaDeviceSynchronize();
             float * product = (float*)malloc(BATCH_SIZE*out_classes*sizeof(float));
             cudaMemcpy(product, d_product, BATCH_SIZE*out_classes*sizeof(float), cudaMemcpyDeviceToHost);
-            printf("Call from host %d\n", correct[0]);
-            printMatrix(product, BATCH_SIZE, out_classes);
-            printf("Actual\n");
-            printMatrix(outputs+(i*out_classes), BATCH_SIZE, out_classes);
+            // printf("Predicted\n");
+            // printMatrix(product, BATCH_SIZE, out_classes);
+            // printf("Actual\n");
+            // printMatrix(outputs+(i*out_classes), BATCH_SIZE, out_classes);
             correct[0] += getAccuracy(product, outputs+(i*out_classes), BATCH_SIZE, out_classes);
             logLoss[0] += crossEntropyLoss(product, outputs+(i*out_classes), BATCH_SIZE, out_classes);
 
-            forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs+(i*n_features), d_weights, d_outputs+(i*out_classes), d_product+(i*out_classes), d_gradients, BATCH_SIZE, n_features, out_classes);
+            forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs+(i*n_features), d_weights, d_outputs+(i*out_classes), d_product, d_gradients, BATCH_SIZE, n_features, out_classes);
             cudaDeviceSynchronize();
             // printf("Outputs\n");
             // printMatrix(outputs+(i*out_classes), BATCH_SIZE, out_classes);
@@ -87,8 +87,8 @@ int main() {
             //backward pass
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_weights, d_gradients, BATCH_SIZE, learning_rate, n_features, out_classes);
             cudaMemcpy(matrix, d_weights, n_features*out_classes*sizeof(float), cudaMemcpyDeviceToHost);
-            printf("Matrix\n");
-            printMatrix(matrix, n_features, out_classes);
+            // printf("Matrix\n");
+            // printMatrix(matrix, n_features, out_classes);
 
         }
         float accuracy = correct[0] / (float)(test_size);

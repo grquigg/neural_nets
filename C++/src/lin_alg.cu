@@ -139,6 +139,6 @@ __global__ void backward_pass(float* weights, float * gradients, int batch_size,
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     //BATCH_SIZE*n_classes length vector
     int batch = batch_size / (blockDim.x * gridDim.x);
-    matrixMultiplyByScalar(gradients+(i*batch*n_classes), n_features, n_classes, learning_rate/(float) batch_size);
+    matrixMultiplyByScalar(gradients+(i*batch*n_classes), batch, n_classes, learning_rate/(float) batch_size);
     matrixSubtract(weights+(i*n_classes*batch), gradients+(i*n_classes*batch), batch, n_classes, batch, n_classes, 1);
 }
