@@ -17,9 +17,10 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
 //we can't unneccessarily waste memory on the GPU so I have to get creative and take a second attempt at writing the modified dotProduct function
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
-__device__ int getAccuracy(float* predicted, float* actual, float height, float width);
 //////////GLOBALS////////
-__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes, int * correct, float * loss);
+__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes);
+
+__global__ void predict(float * inputs, float* weights, float * product, int size, int n_features, int n_classes);
 
 __global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes);
 

@@ -46,7 +46,8 @@ int main(int argc, char** argv) {
     float learning_rate = 0.005;
     int nWorkers = std::stoi(nWorkers_arg);
     int nThreadsPerWorker = std::stoi(nThreads_arg);
-    int BATCH_SIZE = size / (nWorkers * nThreadsPerWorker);
+    //make batch size independent of the size of the array
+    int BATCH_SIZE = 60;
     int nEpochs = 10;
     // std::cout << "BATCH SIZE " << BATCH_SIZE << std::endl;
     float ** output;
@@ -65,50 +66,63 @@ int main(int argc, char** argv) {
     float *d_weights;
     float *d_product;
     float *d_gradients;
-    cudaMalloc(&d_gradients, nFeatures*numClasses*nWorkers*nThreadsPerWorker*sizeof(float));
+    cudaMalloc(&d_gradients, nWorkers*nThreadsPerWorker*nFeatures*numClasses*sizeof(float));
     cudaMalloc(&d_inputs, size*nFeatures*sizeof(float));
     cudaMemcpy(d_inputs, input.data(), size*nFeatures*sizeof(float), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, nFeatures*numClasses*sizeof(float));
     cudaMemcpy(d_weights, weights.data(), nFeatures*numClasses*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_product, size*numClasses*sizeof(float));
-    cudaMemcpy(d_product, product.data(), size*numClasses*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_product, BATCH_SIZE*numClasses*sizeof(float));
+    cudaMemcpy(d_product, product.data(), BATCH_SIZE*numClasses*sizeof(float), cudaMemcpyHostToDevice);
 
     //declare variables for computing metrics
     float *d_loss;
     int *d_correct;
-
+    int *correct = (int*)malloc(sizeof(int));
+    float *logLoss = (float*)malloc(sizeof(float));
     cudaMalloc(&d_loss, sizeof(float));
     cudaMalloc(&d_correct, sizeof(int));
-    cudaMemcpy(d_loss, 0, sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_correct, 0, sizeof(int), cudaMemcpyHostToDevice);
-
     auto endInitial = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = endInitial-startInitial;
-    std::cout << "Finished initial setup in " << elapsed_seconds.count() << " seconds" << std::endl;
+    // std::cout << "Finished initial setup in " << elapsed_seconds.count() << " seconds" << std::endl;
     auto startTrain = std::chrono::system_clock::now();
     for(int i = 0; i < nEpochs; i++) {
-        //forward pass
-        std::cout << "Starting forward pass..." << std::endl;
-        auto initForward = std::chrono::system_clock::now();
-        forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs, d_weights, d_outputs, d_product, d_gradients, BATCH_SIZE, nFeatures, numClasses, d_correct, d_loss);
-        cudaDeviceSynchronize();
-        auto endForward = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_forward = endForward - initForward;
-        std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
-        int totalCorrect = 0;
-        cudaMemcpy(&totalCorrect, d_correct, sizeof(int), cudaMemcpyDeviceToHost);
-        float accuracy = (float) (totalCorrect) / size;
+        *correct = 0;
+        *logLoss = 0;
+        cudaMemcpy(d_loss, logLoss, sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_correct, correct, sizeof(int), cudaMemcpyHostToDevice);
+        for(int j = 0; j < size; j += BATCH_SIZE) {
+            std::cout << "BATCH SIZE " << j << std::endl;
+            //forward pass
+            // std::cout << "Starting forward pass..." << std::endl;
+            auto initForward = std::chrono::system_clock::now();
+
+            forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_inputs+(j*nFeatures), d_weights, d_outputs+(j*nFeatures), d_product, d_gradients, BATCH_SIZE, nFeatures, numClasses, d_correct, d_loss);
+            cudaDeviceSynchronize();
+
+            auto endForward = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_forward = endForward - initForward;
+            // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
+            //compute accuracy
+            cudaMemcpy(correct, d_correct, sizeof(int), cudaMemcpyDeviceToHost);
+            //backward pass
+            ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_gradients, nThreadsPerWorker*nWorkers, nFeatures*numClasses, (nFeatures*numClasses)/(nThreadsPerWorker*nWorkers));
+            cudaDeviceSynchronize();
+            // std::cout << "Starting backward pass..." << std::endl;
+            auto initBackward = std::chrono::system_clock::now();
+            // float * gradients = (float*)malloc(nFeatures*numClasses*sizeof(float));
+            backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_weights, d_gradients, BATCH_SIZE, learning_rate, nFeatures, numClasses);
+            cudaDeviceSynchronize();
+
+            auto endBackward = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_backward = endBackward - initBackward;
+            // cudaMemcpy(gradients, d_gradients, nFeatures*numClasses*sizeof(float), cudaMemcpyDeviceToHost);
+            // printMatrix(gradients, nFeatures, numClasses);
+            // std::cout << "Finished backward pass in " << elapsed_backward.count() << " seconds" << std::endl;
+        }
+        float accuracy = (*correct) / (float) (size);
         printf("Accuracy: %f%%\n", accuracy*100);
-        std::cout << "Starting backward pass..." << std::endl;
-        auto initBackward = std::chrono::system_clock::now();
-        ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_gradients, nWorkers*nThreadsPerWorker, nFeatures*numClasses, (nFeatures*numClasses)/(nWorkers*nThreadsPerWorker));
-        cudaDeviceSynchronize();
-        backward_pass<<<1,1>>>(d_weights, d_gradients, 1, learning_rate, nFeatures, numClasses);
-        cudaDeviceSynchronize();
-        auto endBackward = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_backward = endBackward - initBackward;
-        std::cout << "Finished backward pass in " << elapsed_backward.count() << " seconds" << std::endl;
     }
+
     auto endTrain = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed = endTrain - startTrain;
     std::cout << "Finished training loop in " << elapsed.count() << " seconds" << std::endl;

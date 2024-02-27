@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cassert>
 #include <stdlib.h>
+#include <cmath>
 
 // int convertCharsToInt(std::vector<char>& chars, int begin, int end) {
 //     int d = 0;
@@ -26,6 +27,16 @@ std::vector<float> initializeRandomArray(int mat_height, int mat_width) {
         }
     }
     return weights;
+}
+
+float* initializeFlatRandomArray(int mat_height, int mat_width) {
+    float * arr = (float *)malloc(mat_height * mat_width * sizeof(float));
+    for(int i = 0; i < mat_height; i++) {
+        for(int j = 0; j < mat_width; j++) {
+            arr[(i*mat_width)+j] = 1/(float) ((i*mat_width)+j+1);
+        }
+    }
+    return arr;
 }
 
 std::vector<std::vector<int>> readDataFromUByteFile(std::string filePath) {
@@ -72,6 +83,28 @@ void printMatrix(float * arr, int height, int width) {
     }
 }
 
+int getAccuracy(float* predicted, float* actual, int height, int width) {
+    int correct = 0;
+    for (int i = 0; i < height; i++) {
+        int max = 0;
+        float max_score = 0.0;
+        int a = 0;
+        for (int j = 0; j < width; j++) {
+            if (predicted[(i*width)+j] > max_score) {
+                max = j;
+                max_score = predicted[(i*width)+j];
+            }
+            if (actual[(i*width)+j] == 1.0) {
+                a = j;
+            }
+        }
+        if ((int) a == max) {
+            correct++;
+        }
+    }
+    return correct;
+}
+
 void printMatrix(std::vector<float> arr, int height, int width) {
     for(int i = 0; i < height; i++) {
         for(int j = 0; j < width; j++) {
@@ -79,4 +112,14 @@ void printMatrix(std::vector<float> arr, int height, int width) {
         }
         std::cout << std::endl;
     }
+}
+
+float crossEntropyLoss(float* predicted, float* actual, int height, int width) {
+    float log_sum = 0;
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            log_sum -= (actual[i*width+j] * logf(predicted[i*width+j]));
+        }
+    }
+    return log_sum;
 }
