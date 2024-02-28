@@ -98,34 +98,16 @@ __global__ void ringReduce(float* gradients, const int total_steps, const int st
 }
 __global__ void predict(float * inputs, float* weights, float * product, int size, int n_features, int n_classes) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
-    //BATCH_SIZE*n_classes length vector
-    // printf("Started %d %d\n", blockIdx.x, threadIdx.x);
     int batch = size / (blockDim.x * gridDim.x);
     dotProduct(inputs+(i*n_features*batch), weights, product+(i*n_classes*batch), batch, n_features, n_features, n_classes);
-    // printf("Success %d\n", i);
     softmax(product+(i*n_classes*batch), batch, n_classes);
 }
 
 __global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
-    //BATCH_SIZE*n_classes length vector
-    // printf("Started %d %d\n", blockIdx.x, threadIdx.x);
     int batch = size / (blockDim.x * gridDim.x);
-    // printf("Batch %d\n", batch);
-    // dotProduct(inputs+(i*n_features*batch), weights, product+(i*n_classes*batch), batch, n_features, n_features, n_classes);
-    // // printf("Success %d\n", i);
-    // softmax(product+(i*n_classes*batch), batch, n_classes);
-    // printf("%d %d\n", size*n_classes, i*batch*n_classes);
-    // //we can compute accuracy on the forward pass
     matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, product+(i*n_classes*batch));
-    // // printf("This %d\n", i);
     dotProductTranspose(inputs+(i*batch*n_features), product+(i*batch*n_classes), gradients+(i*n_features*n_classes), batch, n_features, batch, n_classes);
-    // printf("This is %d\n", i);
-    // printf("Completed %d %d\n", blockIdx.x, threadIdx.x);
-    //ring reduce
-    //we can allow each thread to 
-    //index i means that we are responsible for cumulating together the ith chunk of gradient
-    // ringReduce(gradients, i*chunk_size, (i+1)*chunk_size, total_parts, n_features*n_classes, chunk_size);
 }
 
 __global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes) {
