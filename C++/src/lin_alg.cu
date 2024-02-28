@@ -95,12 +95,6 @@ __global__ void ringReduce(float* gradients, const int total_steps, const int st
             gradients[j] += gradients[(i*step_size)+j];
         }
     }
-    for(int i = 0; i < total_steps; i++) {
-        for(int j = begin_part; j < end_part; j++) {
-            gradients[(i*step_size)+j] = gradients[j];
-        }
-    }
-    //and in the set loop, we're setting every copy of the gradients in our array to be equal to the most recently updated entry
 }
 __global__ void predict(float * inputs, float* weights, float * product, int size, int n_features, int n_classes) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
@@ -118,9 +112,9 @@ __global__ void forward_pass(float* inputs, float* weights, float* outputs, floa
     // printf("Started %d %d\n", blockIdx.x, threadIdx.x);
     int batch = size / (blockDim.x * gridDim.x);
     // printf("Batch %d\n", batch);
-    dotProduct(inputs+(i*n_features*batch), weights, product+(i*n_classes*batch), batch, n_features, n_features, n_classes);
-    // printf("Success %d\n", i);
-    softmax(product+(i*n_classes*batch), batch, n_classes);
+    // dotProduct(inputs+(i*n_features*batch), weights, product+(i*n_classes*batch), batch, n_features, n_features, n_classes);
+    // // printf("Success %d\n", i);
+    // softmax(product+(i*n_classes*batch), batch, n_classes);
     // printf("%d %d\n", size*n_classes, i*batch*n_classes);
     // //we can compute accuracy on the forward pass
     matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, product+(i*n_classes*batch));
