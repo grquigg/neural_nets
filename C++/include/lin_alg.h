@@ -4,7 +4,7 @@
 #include <vector>
 
 //////////DEVICES////////
-__device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float scalar);
+__device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float * outVec);
 
 __device__ void matrixAdd(float * matrix1, float * matrix2, int m1_h, int m1_w);
 

@@ -7,19 +7,21 @@
 __device__ void softmax(float* product, int product_height, int product_width) {
     float total = 0.0;
     float logSumTotal = 0.0;
-    float maxLogit = 0;
+    float maxLogit = 0.0;
     for (int i = 0; i < product_height; i++) {
         total = 0.0;
         for (int j = 0; j < product_width; j++) {
             total += exp(product[i*product_width+j]);
         }
-        logSumTotal = logf(total);
+        logSumTotal = log(total);
         float prob_sums = 0.0;
         for (int j = 0; j < product_width; j++) {
             product[i*product_width+j] = exp(product[i*product_width+j] - logSumTotal);
             prob_sums += product[i*product_width+j];
         }
-        
+        // if(prob_sums != 1.0) {
+        // printf("Problem %f %f\n", prob_sums, logSumTotal);
+        // }
     }
 }
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
@@ -30,9 +32,6 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
             product[i*weight_w+j] = 0.0;
             for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
                 product[i*weight_w+j] += inputs[i*vector_w+k] * weights[k*weight_w+j];
-                if (product[i*vector_w+j] > 10000) {
-                    printf("Problem children from normal dot product: %.15f %.15f\n", inputs[i*vector_w+k], weights[k*weight_w+j]);
-                }
                 //printf("Temp product: %f\n", product[i][j]);
             }
             //printf("%f\n", product[i][j]);
@@ -52,12 +51,11 @@ __device__ void dotProductTranspose(float* inputs, float* weights, float * produ
     }
 }
 
-__device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float scalar) {
+__device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float* outVec) {
     if (m1_h == m2_h && m1_w == m2_w) {
         for (int i = 0; i < m1_h; i++) {
             for (int j = 0; j < m1_w; j++) {
-                matrix1[(i*m1_w)+j]-=matrix2[(i*m1_w)+j];
-                matrix1[(i*m1_w)+j]*=scalar;
+                outVec[(i*m1_w)+j] = matrix1[(i*m1_w)+j]-matrix2[(i*m1_w)+j];
             }
         }
     }
@@ -119,12 +117,13 @@ __global__ void forward_pass(float* inputs, float* weights, float* outputs, floa
     //BATCH_SIZE*n_classes length vector
     // printf("Started %d %d\n", blockIdx.x, threadIdx.x);
     int batch = size / (blockDim.x * gridDim.x);
+    // printf("Batch %d\n", batch);
     dotProduct(inputs+(i*n_features*batch), weights, product+(i*n_classes*batch), batch, n_features, n_features, n_classes);
     // printf("Success %d\n", i);
     softmax(product+(i*n_classes*batch), batch, n_classes);
     // printf("%d %d\n", size*n_classes, i*batch*n_classes);
     // //we can compute accuracy on the forward pass
-    matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, 1);
+    matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, product+(i*n_classes*batch));
     // // printf("This %d\n", i);
     dotProductTranspose(inputs+(i*batch*n_features), product+(i*batch*n_classes), gradients+(i*n_features*n_classes), batch, n_features, batch, n_classes);
     // printf("This is %d\n", i);
@@ -138,7 +137,7 @@ __global__ void forward_pass(float* inputs, float* weights, float* outputs, floa
 __global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     //BATCH_SIZE*n_classes length vector
-    int batch = batch_size / (blockDim.x * gridDim.x);
+    int batch = n_features / (blockDim.x * gridDim.x);
     matrixMultiplyByScalar(gradients+(i*batch*n_classes), batch, n_classes, learning_rate/(float) batch_size);
-    matrixSubtract(weights+(i*n_classes*batch), gradients+(i*n_classes*batch), batch, n_classes, batch, n_classes, 1);
+    matrixSubtract(weights+(i*n_classes*batch), gradients+(i*n_classes*batch), batch, n_classes, batch, n_classes, weights+(i*n_classes*batch));
 }

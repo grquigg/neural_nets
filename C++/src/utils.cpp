@@ -94,7 +94,7 @@ int getAccuracy(float* predicted, float* actual, int height, int width) {
                 max = j;
                 max_score = predicted[(i*width)+j];
             }
-            if (actual[(i*width)+j] == 1.0) {
+            if ((int) actual[(i*width)+j] == 1) {
                 a = j;
             }
         }
@@ -118,7 +118,9 @@ float crossEntropyLoss(float* predicted, float* actual, int height, int width) {
     float log_sum = 0;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
-            log_sum -= (actual[i*width+j] * logf(predicted[i*width+j]));
+            if(predicted[i*width+j] > 1.0e-33) {
+                log_sum -= (actual[i*width+j] * log(predicted[i*width+j]));
+            }
         }
     }
     return log_sum;
