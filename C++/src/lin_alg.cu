@@ -7,7 +7,6 @@
 __device__ void softmax(float* product, int product_height, int product_width) {
     float total = 0.0;
     float logSumTotal = 0.0;
-    float maxLogit = 0.0;
     for (int i = 0; i < product_height; i++) {
         total = 0.0;
         for (int j = 0; j < product_width; j++) {
@@ -19,9 +18,7 @@ __device__ void softmax(float* product, int product_height, int product_width) {
             product[i*product_width+j] = exp(product[i*product_width+j] - logSumTotal);
             prob_sums += product[i*product_width+j];
         }
-        // if(prob_sums != 1.0) {
-        // printf("Problem %f %f\n", prob_sums, logSumTotal);
-        // }
+
     }
 }
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {

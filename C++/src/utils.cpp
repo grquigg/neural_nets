@@ -83,7 +83,7 @@ void printMatrix(float * arr, int height, int width) {
     }
 }
 
-int getAccuracy(float* predicted, float* actual, int height, int width) {
+int getAccuracy(float* predicted, std::vector<std::vector<int>> actual, int height, int width, int index) {
     int correct = 0;
     for (int i = 0; i < height; i++) {
         int max = 0;
@@ -94,11 +94,8 @@ int getAccuracy(float* predicted, float* actual, int height, int width) {
                 max = j;
                 max_score = predicted[(i*width)+j];
             }
-            if ((int) actual[(i*width)+j] == 1) {
-                a = j;
-            }
         }
-        if ((int) a == max) {
+        if ((int) actual[i+index][0] == max) {
             correct++;
         }
     }
@@ -114,13 +111,12 @@ void printMatrix(std::vector<float> arr, int height, int width) {
     }
 }
 
-float crossEntropyLoss(float* predicted, float* actual, int height, int width) {
+float crossEntropyLoss(float* predicted, std::vector<std::vector<int>> actual, int height, int width, int index) {
     float log_sum = 0;
     for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width; j++) {
-            if(predicted[i*width+j] > 1.0e-33) {
-                log_sum -= (actual[i*width+j] * log(predicted[i*width+j]));
-            }
+        int prediction = actual[index+i][0];
+        if(predicted[i*width+prediction] > 1.0e-33) {
+            log_sum -= (log(predicted[i*width+prediction]));
         }
     }
     return log_sum;

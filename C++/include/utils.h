@@ -15,7 +15,7 @@ void printMatrix(float * arr, int height, int width);
 
 void printMatrix(std::vector<float> arr, int height, int width);
 
-int getAccuracy(float* predicted, float* actual, int height, int width);
+int getAccuracy(float* predicted, std::vector<std::vector<int>> actual, int height, int width, int index);
 
-float crossEntropyLoss(float* predicted, float* actual, int height, int width);
+float crossEntropyLoss(float* predicted, std::vector<std::vector<int>> actual, int height, int width, int index);
 #endif
