@@ -2,6 +2,7 @@
 #define LIN_ALG_H
 
 #include <vector>
+#include "../include/models.h"
 
 //////////DEVICES////////
 __device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float * outVec);
@@ -18,15 +19,23 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
 //////////GLOBALS////////
-__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes);
+
+__global__ void predict(LogisticRegression* model, float* inputs, float* product, int size);
 
 __global__ void predict(float * inputs, float* weights, float * product, int size, int n_features, int n_classes);
 
+__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes);
+
+__global__ void forward_pass(LogisticRegression* model, float* inputs, float* outputs, float* product, int size, int nClasses);
+
 __global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes);
 
+__global__ void backward_pass(LogisticRegression* model, int batch_size, float learning_rate);
 /*
 The only issue that ringReduce might have in our current implementation is that we don't know how many steps we need to actually take
 However, we can leverage the fact that each thread has awareness of the global dimensions, so that's how many partitions we need to use
 */
 __global__ void ringReduce(float * gradients, const int total_steps, const int step_size, const int chunk_size);
+
+__global__ void ringReduce(LogisticRegression * model, const int total_steps, const int step_size, const int chunk_size);
 #endif

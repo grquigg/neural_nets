@@ -2,7 +2,6 @@
 #include <iostream>
 #include "../include/lin_alg.h"
 
-
 //////////DEVICES////////
 __device__ void softmax(float* product, int product_height, int product_width) {
     float total = 0.0;
@@ -93,6 +92,18 @@ __global__ void ringReduce(float* gradients, const int total_steps, const int st
         }
     }
 }
+
+__global__ void ringReduce(LogisticRegression * model, const int total_steps, const int step_size, const int chunk_size) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    int begin_part = index*chunk_size;
+    int end_part = (index+1)*chunk_size;
+    for(int i = 1; i < total_steps; i++) {
+        for(int j = begin_part; j < end_part; j++) {
+            model->gradients[j] += model->gradients[(i*step_size)+j];
+        }
+    }
+    // printf("Ring reduce\n");
+}
 __global__ void predict(float * inputs, float* weights, float * product, int size, int n_features, int n_classes) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     int batch = size / (blockDim.x * gridDim.x);
@@ -100,11 +111,24 @@ __global__ void predict(float * inputs, float* weights, float * product, int siz
     softmax(product+(i*n_classes*batch), batch, n_classes);
 }
 
+__global__ void predict(LogisticRegression* model, float* inputs, float* product, int size) {
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    int batch = size / (blockDim.x * gridDim.x);
+    dotProduct(inputs+(i*(model->nFeatures)*batch), model->weights, product+(i*(model->nClasses)*batch), batch, model->nFeatures, model->nFeatures, model->nClasses);
+    softmax(product+(i*(model->nClasses)*batch), batch, (model->nClasses));
+}
 __global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes) {
     int i = blockIdx.x*blockDim.x + threadIdx.x;
     int batch = size / (blockDim.x * gridDim.x);
     matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, product+(i*n_classes*batch));
     dotProductTranspose(inputs+(i*batch*n_features), product+(i*batch*n_classes), gradients+(i*n_features*n_classes), batch, n_features, batch, n_classes);
+}
+
+__global__ void forward_pass(LogisticRegression* model, float* inputs, float* outputs, float* product, int size, int nClasses) {
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    int batch = size / (blockDim.x * gridDim.x);
+    matrixSubtract(product+(i*nClasses*batch), outputs+(i*nClasses*batch), batch, nClasses, batch, nClasses, product+(i*nClasses*batch));
+    dotProductTranspose(inputs+(i*batch*(model->nFeatures)), product+(i*batch*(model->nClasses)), ((*model).gradients)+(i*(model->nClasses)*(model->nFeatures)), batch, (model->nFeatures), batch, (model->nClasses));
 }
 
 __global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes) {
@@ -113,4 +137,18 @@ __global__ void backward_pass(float* weights, float * gradients, int batch_size,
     int batch = n_features / (blockDim.x * gridDim.x);
     matrixMultiplyByScalar(gradients+(i*batch*n_classes), batch, n_classes, learning_rate/(float) batch_size);
     matrixSubtract(weights+(i*n_classes*batch), gradients+(i*n_classes*batch), batch, n_classes, batch, n_classes, weights+(i*n_classes*batch));
+}
+
+__global__ void backward_pass(LogisticRegression* model, int batch_size, float learning_rate) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    //BATCH_SIZE*n_classes length vector
+    int batch = model->nFeatures / (blockDim.x * gridDim.x);
+    int start = index*batch*(model->nClasses);
+    for(int i = 0; i < batch; i++) {
+        for(int j = 0; j < model->nClasses; j++) {
+            (*model).gradients[start+i*(model->nClasses)+j] *= (learning_rate / batch_size);
+            (*model).weights[start+i*(model->nClasses)+j] -=  (*model).gradients[start+i*(model->nClasses)+j];
+        }
+    }
+    // printf("Finish backward\n");
 }

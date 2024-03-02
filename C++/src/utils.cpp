@@ -22,7 +22,7 @@ std::vector<float> initializeRandomArray(int mat_height, int mat_width) {
     for (int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
             // weights[i*mat_width+j] = (float)rand()/(float)(RAND_MAX/a);
-            weights[i*mat_width+j] = 0.25;
+            // weights[i*mat_width+j] = 0.25;
             //the most important line in the entire program
         }
     }
@@ -31,9 +31,11 @@ std::vector<float> initializeRandomArray(int mat_height, int mat_width) {
 
 float* initializeFlatRandomArray(int mat_height, int mat_width) {
     float * arr = (float *)malloc(mat_height * mat_width * sizeof(float));
+    int a = 1;
     for(int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
-            arr[(i*mat_width)+j] = 1/(float) ((i*mat_width)+j+1);
+            // arr[(i*mat_width)+j] = 1/(float) ((i*mat_width)+j+1);
+            arr[(i*mat_width)+j] = (float)rand()/(float)(RAND_MAX/a);
         }
     }
     return arr;
@@ -64,7 +66,7 @@ std::vector<std::vector<int>> readDataFromUByteFile(std::string filePath) {
     //this will never be resized, thankfully
     //arr is the variable we return once we initialize it with the values from our file
     //iniaitlize values
-    std::vector<std::vector<int>> arr(60000, std::vector<int>(second, 0));
+    std::vector<std::vector<int>> arr(dimensions[0], std::vector<int>(second, 0));
     for(int i = 0; i < dimensions[0]; i++) {
         for(int j = 0; j < second; j++) {
             arr[i][j] = buffer[buffer_ptr];
