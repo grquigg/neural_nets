@@ -3,6 +3,7 @@
 #include "../include/lin_alg.h"
 
 //////////DEVICES////////
+
 __device__ void softmax(float* product, int product_height, int product_width) {
     float total = 0.0;
     float logSumTotal = 0.0;
@@ -28,8 +29,8 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
             product[i*weight_w+j] = 0.0;
             for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
                 product[i*weight_w+j] += inputs[i*vector_w+k] * weights[k*weight_w+j];
-                //printf("Temp product: %f\n", product[i][j]);
             }
+            // printf("Temp product: %d %d %f\n", i, j, product[i*weight_w+j]);
             //printf("%f\n", product[i][j]);
         }
     }
@@ -148,6 +149,89 @@ __global__ void backward_pass(LogisticRegression* model, int batch_size, float l
         for(int j = 0; j < model->nClasses; j++) {
             (*model).gradients[start+i*(model->nClasses)+j] *= (learning_rate / batch_size);
             (*model).weights[start+i*(model->nClasses)+j] -=  (*model).gradients[start+i*(model->nClasses)+j];
+        }
+    }
+    // printf("Finish backward\n");
+}
+
+///NEURAL NETWORK CODE
+
+__global__ void predict(NeuralNetwork* model, float* inputs, float* product, int size, int* offsets) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    int batch = size / (blockDim.x * gridDim.x);
+    /*
+    Each thread takes a chunk of the input data and feeds it all the way through the neural network, storing the intermediary results in product along the way.
+    Just going to use softmax as the default activation as I'm more familiar with how that works anyways
+    */
+    dotProduct(inputs+(index*(model->layer_size[0])*batch), model->weights[0], product+index*(model->layer_size[1])*batch, batch, model->layer_size[0], model->layer_size[0], model->layer_size[1]);
+    softmax(product+index*(model->layer_size[1])*batch, batch, (model->layer_size[1]));
+    // printf("Current activation index: %d\n", activation_index);
+    int layer = 0;
+    printf("%f\n", product[0]);
+    for(int j = 1; j < model->nLayers; j++) {
+        printf("Exec %d\n", offsets[j-1]);
+        dotProduct(product+offsets[j-1]+(index*(model->layer_size[j])*batch), model->weights[j], product+offsets[j]+(index*(model->layer_size[j+1])*batch), batch, model->layer_size[j], model->layer_size[j], model->layer_size[j+1]);
+        softmax(product+offsets[j]+(index*(model->layer_size[j+1])*batch), batch, model->layer_size[j+1]);
+    }
+    printf("Previously %d %f\n", offsets[model->nLayers-1], *(product+offsets[model->nLayers-1]));
+    printf("End of predict\n");
+}
+
+__global__ void forward_pass(NeuralNetwork* model, float* inputs, float* outputs, float* activations, int * offsets, int size, int nClasses) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    int batch = size / (blockDim.x * gridDim.x);
+    /*
+    to do the forward pass, we need to take the dot product of the current activations and the previous activations. This is gonna take some effort, so maybe we should
+    */
+    /*Step 1: Subtract current predictions from the actual output (same step as in logistic regression)
+    But there's a caveat involved in where we actually store the results*/
+    int currentLayer = model->nLayers-1;
+    // printf("Activation index: %d\n", activation_index + (index*batch));
+    float* current = activations+offsets[currentLayer];
+    float* prev = activations+offsets[currentLayer-1];
+    matrixSubtract(current+(index*nClasses*batch), outputs+(index*nClasses*batch), batch, nClasses, batch, nClasses, current+(index*nClasses*batch));
+    dotProductTranspose(prev+(index*batch*(model->layer_size[currentLayer])), current+(index*nClasses*batch), ((*model).gradients[currentLayer])+(index*(nClasses)*(model->layer_size[currentLayer])), batch, (model->layer_size[currentLayer]), batch, (nClasses));
+    // printMatrix(model->gradients[currentLayer-1]+index*(nClasses)*(model->layer_size[currentLayer]),);
+    currentLayer--;
+    // current = activations[currentLayer];
+    // prev = activations[currentLayer-1];
+    // for(int i = currentLayer; i > 0; i--) {
+    //     //do something else
+    //     printf("Don't call this\n");
+    // }
+    // matrixSubtract(inputs+(index*model->layer_size[0]*batch), current+(index*batch*model->layer_size[0]), batch, model->layer_size[0], batch, model->layer_size[0], current+(index*batch*model->layer_size[0]));
+    // dotProductTranspose(activations+(index*model->layer_size[0]*batch), activations+offsets[i]+(index*model->layer_size[1]*batch), ((*model).gradients[0])+(index*(model->layer_size[0])*(model->layer_size[1])), batch, (model->layer_size[0]), batch, (model->layer_size[1]));
+    // printf("Success of forward pass\n");
+}
+
+__global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    for(int i = 0; i < model->nLayers; i++) {
+        int step_size = (model->layer_size[i] * model->layer_size[i+1]);
+        int batch = (model->layer_size[i] * model->layer_size[i+1]) /(blockDim.x * gridDim.x);
+        int start = index*batch;
+        int end = (index+1)*batch;
+
+        for(int j = 1; j < total_steps; j++) {
+            for(int k = start; k < end; k++) {
+                // printf("Entry %d %d\n", j, k);
+                model->gradients[i][k] += model->gradients[i][k+(j*step_size)];
+            }
+        }
+    }
+}
+
+__global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    //BATCH_SIZE*n_classes length vector
+    for(int k = 0; k < model->nLayers; k++) {
+        // printf("Layer %d\n", k);
+        int batch = (model->layer_size[k] * model->layer_size[k+1]) /(blockDim.x * gridDim.x);
+        int start = index*batch;
+        for(int i = 0; i < batch; i++) {
+            printf("Gradient at %d %d %f\n", k, i, (*model).gradients[k][start+i]);
+            (*model).gradients[k][start+i] *= (learning_rate / batch_size);
+            (*model).weights[k][start+i] -=  (*model).gradients[k][start+i];
         }
     }
     // printf("Finish backward\n");

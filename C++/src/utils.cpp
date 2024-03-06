@@ -35,7 +35,8 @@ float* initializeFlatRandomArray(int mat_height, int mat_width) {
     for(int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
             // arr[(i*mat_width)+j] = 1/(float) ((i*mat_width)+j+1);
-            arr[(i*mat_width)+j] = (float)rand()/(float)(RAND_MAX/a);
+            // arr[(i*mat_width)+j] = (float)rand()/(float)(RAND_MAX/a);
+            arr[(i*mat_width)+j]=0.25;
         }
     }
     return arr;
@@ -113,11 +114,11 @@ void printMatrix(std::vector<float> arr, int height, int width) {
     }
 }
 
-float crossEntropyLoss(float* predicted, std::vector<std::vector<int>> actual, int height, int width, int index) {
-    float log_sum = 0;
+double crossEntropyLoss(float* predicted, std::vector<std::vector<int>>& actual, int height, int width, int index) {
+    double log_sum = 0;
     for (int i = 0; i < height; i++) {
         int prediction = actual[index+i][0];
-        if(predicted[i*width+prediction] > 1.0e-33) {
+        if(predicted[i*width+prediction] > 1.0e-32) {
             log_sum -= (log(predicted[i*width+prediction]));
         }
     }

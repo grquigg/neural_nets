@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
     // std::string nThreads_arg = argv[6];
     int numClasses = 10;
     int BATCH_SIZE = 4000;
-    int nEpochs = 100;
-    float learning_rate = 0.02;
+    int nEpochs = 1;
+    float learning_rate = 0.01;
     int nWorkers = 16;
     int nThreadsPerWorker = 10;
 
@@ -48,13 +48,32 @@ int main(int argc, char** argv) {
     std::vector<std::vector<int>> test_outputs = readDataFromUByteFile(test_label_path);
     assert(test_outputs.size() == 10000);
     ////MODEL/GPU LOGIC////
-    //define our model on the client side
-    LogisticRegression* model = (LogisticRegression *)malloc(sizeof(LogisticRegression));
-    model->nFeatures = nFeatures;
-    model->nClasses = numClasses;
-    model->weights = initializeFlatRandomArray(nFeatures, numClasses);
-    model->gradients = (float*)malloc(nThreadsPerWorker*nWorkers*nFeatures*numClasses*sizeof(float));
+    //define our model on the host side
+    //LOGISTIC REGRESSION
+    // LogisticRegression* model = (LogisticRegression *)malloc(sizeof(LogisticRegression));
+    // model->nFeatures = nFeatures;
+    // model->nClasses = numClasses;
+    // model->weights = initializeFlatRandomArray(nFeatures, numClasses);
+    // model->gradients = (float*)malloc(nThreadsPerWorker*nWorkers*nFeatures*numClasses*sizeof(float));
 
+    //NEURAL NETWORK
+    NeuralNetwork* model = new NeuralNetwork;
+    model->nClasses = numClasses;
+    model->nLayers = 2;
+    model->lambda = 1.0;
+    model->layer_size = (int*)malloc((model->nLayers+1)*sizeof(int));
+    model->layer_size[0] = 784;
+    model->layer_size[1] = 800;
+    model->layer_size[2] = 10;
+    
+    model->weights = (float**)malloc((model->nLayers)*sizeof(float*));
+    model->biases = (float**)malloc((model->nLayers)*sizeof(float*));
+    model->gradients = (float**)malloc((model->nLayers)*sizeof(float*));
+    for(int i = 1; i < model->nLayers+1; i++) {
+        model->weights[i-1] = initializeFlatRandomArray(model->layer_size[i-1], model->layer_size[i]);
+        model->biases[i-1] = initializeFlatRandomArray(1, model->layer_size[i]);
+        model->gradients[i-1] =(float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]);
+    }
     //pass training function
     //the train function takes all of the HOST variables and passes them to the GPU before running the training algorithm
     /*
@@ -74,5 +93,6 @@ int main(int argc, char** argv) {
     12. number of threads per worker
     */
     train(model, input.data(), outputs, test_input.data(), test_outputs, nEpochs, BATCH_SIZE, size, test_size, learning_rate, nWorkers, nThreadsPerWorker);
+    free(model);
     return 0;
 }

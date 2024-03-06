@@ -4,14 +4,17 @@
 #include <vector>
 #include "../include/models.h"
 
-//////////DEVICES////////
+//////////DEVICES/GENERAL LINEAR ALGEBRA FUNCTIONS////////
+
+__device__ void reLU(float* mat, int height, int width);
+
+__device__ void softmax(float* product, int product_height, int product_width);
+
 __device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float * outVec);
 
 __device__ void matrixAdd(float * matrix1, float * matrix2, int m1_h, int m1_w);
 
 __device__ void matrixMultiplyByScalar(float* matrix, int m1_h, int m1_w, float scalar);
-
-__device__ void softmax(float* product, int product_height, int product_width);
 
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
@@ -38,4 +41,12 @@ However, we can leverage the fact that each thread has awareness of the global d
 __global__ void ringReduce(float * gradients, const int total_steps, const int step_size, const int chunk_size);
 
 __global__ void ringReduce(LogisticRegression * model, const int total_steps, const int step_size, const int chunk_size);
+
+__global__ void forward_pass(NeuralNetwork* model, float* inputs, float* outputs, float* activations, int* offsets, int size, int nClasses);
+
+__global__ void predict(NeuralNetwork* model, float* inputs, float* activations, int size, int* offsets);
+
+__global__ void ringReduce(NeuralNetwork* model, const int total_steps);
+
+__global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate);
 #endif
