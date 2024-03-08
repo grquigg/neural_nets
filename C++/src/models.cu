@@ -69,8 +69,9 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         cudaMalloc(&temp_grad_biases[i-1], model->layer_size[i]*sizeof(float));
     }
     cudaMalloc(&d_gradients, (model->nLayers)*sizeof(float*));
-    cudaMalloc(&d_grad_biases, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_gradients, temp_gradients, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_grad_biases, (model->nLayers)*sizeof(float*));
+    cudaMemcpy(d_grad_biases, temp_grad_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));

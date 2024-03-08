@@ -243,6 +243,13 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         }
         printf("\n");
     }
+    for(int j = 0; j < batch; j++) {
+        model->grad_biases[currentLayer][j] = 0.0;
+        for(int k = 0; k < model->layer_size[currentLayer+1]; k++) {
+            model->grad_biases[currentLayer][j] += deltaPtr[k*model->layer_size[currentLayer+1]+j];
+        }
+        printf("Grad bias at %d %d %f\n", currentLayer, j, model->grad_biases[currentLayer][j]);
+    }
     for(int i = currentLayer; i > 0; i--) {
         printf("dims %d %d\n", model->layer_size[i], model->layer_size[i+1]);
         //compute a dot product with
@@ -259,7 +266,14 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
             }
             printf("\n");
         }
-
+        //compute gradients with respect to the biases
+        for(int j = 0; j < model->layer_size[i]; j++) {
+            model->grad_biases[i-1][j] = 0.0;
+            for(int k = 0; k < batch; k++) {
+                model->grad_biases[i-1][j] += deltaPtr[k*(model->layer_size[i])+j];
+            }
+            printf("Grad bias at %d %d %f\n", i, j, model->grad_biases[i-1][j]);
+        }
         printf("No problems\n");
         free(transpose);
         currentLayer--;
