@@ -48,6 +48,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     float **d_weights;
     float **d_biases;
     float **d_gradients;
+    float **d_grad_biases;
     //allocate all of the memory that we need to CUDA
     cudaMalloc(&d_model, sizeof(NeuralNetwork));
     cudaMalloc(&nLayers, (model->nLayers+1)*sizeof(int));
@@ -57,6 +58,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     float **temp_weights = new float*[model->nLayers];
     float **temp_biases = new float*[model->nLayers];
     float **temp_gradients = new float*[model->nLayers];
+    float **temp_grad_biases = new float*[model->nLayers];
     for(int i = 1; i < model->nLayers+1; i++) {
         cudaMalloc(&temp_weights[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         cudaMemcpy(temp_weights[i-1], model->weights[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
@@ -64,8 +66,10 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         cudaMemcpy(temp_biases[i-1], model->biases[i-1], model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
+        cudaMalloc(&temp_grad_biases[i-1], model->layer_size[i]*sizeof(float));
     }
     cudaMalloc(&d_gradients, (model->nLayers)*sizeof(float*));
+    cudaMalloc(&d_grad_biases, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_gradients, temp_gradients, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
@@ -78,6 +82,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     temp.weights = d_weights;
     temp.gradients = d_gradients;
     temp.biases = d_biases;
+    temp.grad_biases = d_grad_biases;
     temp.lambda = model->lambda;
     cudaMemcpy(d_model, &temp, sizeof(NeuralNetwork), cudaMemcpyHostToDevice);
     return d_model;
@@ -132,8 +137,8 @@ void train(LogisticRegression *model, float* train_input, std::vector<std::vecto
             cudaMemcpy(predictions, d_product, batch_size*(model->nClasses)*sizeof(float), cudaMemcpyDeviceToHost);
             // printf("Probabilities\n");
             // printMatrix(product, batch_size, model->nClasses);
-            correct += getAccuracy(predictions, train_labels, batch_size, model->nClasses, j);
-            logLoss += crossEntropyLoss(predictions, train_labels, batch_size, model->nClasses, j);
+            // correct += getAccuracy(predictions, train_labels, batch_size, model->nClasses, j);
+            // logLoss += crossEntropyLoss(predictions, train_labels, batch_size, model->nClasses, j);
             forward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->nFeatures)), d_outputs+(j*(model->nClasses)), d_product, batch_size, model->nClasses);
             cudaDeviceSynchronize();
 
@@ -195,12 +200,16 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 
     //convert labels to one hot encoding
     float * one_hot = (float *)malloc(sizeof(float) * total_size * model->nClasses);
-    for (int i = 0; i < total_size; i++) {
-        for(int j = 0; j < model->nClasses; j++) {
-            one_hot[i*model->nClasses+j] = 0;
-        }
-        one_hot[i*(model->nClasses)+train_labels[i][0]] = 1.0;
-    }
+    // for (int i = 0; i < total_size; i++) {
+    //     for(int j = 0; j < model->nClasses; j++) {
+    //         one_hot[i*model->nClasses+j] = 0;
+    //     }
+    //     one_hot[i*(model->nClasses)+train_labels[i][0]] = 1.0;
+    // }
+    one_hot[0] = 0.75;
+    one_hot[1] = 0.98;
+    one_hot[2] = 0.75;
+    one_hot[3] = 0.28;
     //pass labels to GPU
     float *d_outputs = transferMatrixToDevice(one_hot, total_size, model->nClasses);
 
@@ -219,18 +228,28 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     int * offsets = new int[model->nLayers];
     for(int i = 1; i <= model->nLayers; i++) {
         offsets[i-1] = (batch_size * activations_size);
-        activations_size += model->layer_size[i-1];
+        activations_size += model->layer_size[i];
         printf("Offset at %d %d\n", i-1, offsets[i-1]);
     }
-    float * d_activations = new float[activations_size];
-
+    float * d_activations = new float[batch_size*activations_size];
+    float * activations = new float[batch_size*activations_size];
+    printf("Activations size: %d\n", batch_size*activations_size);
     //device pointers
     int * d_offsets;
     cudaMalloc(&d_activations, activations_size*batch_size*sizeof(float));
     cudaMalloc(&d_offsets, model->nLayers*sizeof(int));
+    for(int i = 0; i < activations_size*batch_size; i++) {
+        activations[i] = 1;
+    }
+    cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_offsets, offsets, model->nLayers*sizeof(int), cudaMemcpyHostToDevice);
+
+    //deltas
+    float * d_deltas = new float[batch_size*activations_size];
+    cudaMalloc(&d_deltas, activations_size*batch_size*sizeof(float));
+    cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
     // float * d_product = transferMatrixToDevice(activations, batch_size, activations_size);
-    //initialize array for storing predictions of test set on host
+    // //initialize array for storing predictions of test set on host
     float * test_predictions = (float*)malloc(test_size*model->nClasses*sizeof(float));
     float * d_test_product = transferMatrixToDevice(test_predictions, test_size, model->nClasses);
     //define metrics
@@ -245,42 +264,36 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 
         for(int j = 0; j < batch_size; j+=batch_size) {
             //pass inputs through the network
-            predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, batch_size, d_offsets);
-            cudaDeviceSynchronize();
-            float * predictions = (float*)malloc(batch_size*(model->layer_size[0])*sizeof(float));
-            for(int k = 0; k < batch_size*(model->layer_size[0]); k++) {
-                predictions[k] = 1;
+            predict<<<1,1>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
+            // cudaDeviceSynchronize();
+            float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
+            error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+            for(int k = 0; k < model->nLayers; k++) {
+                printf("Activations at layer %d\n", k);
+                printMatrix(predictions+offsets[k], batch_size, model->layer_size[k+1]);
             }
-            error = cudaMemcpy(predictions, d_activations+offsets[model->nLayers], batch_size*(model->layer_size[0])*sizeof(float), cudaMemcpyDeviceToHost);
-            if(error != cudaSuccess) {
-                std::cout << "Error in code " << error << std::endl;
-            }
-            cudaDeviceSynchronize();
-            // printf("Fine\n");
-            // printf("Predictions:\n");
-            printf("%f\n", predictions[0]);
-            // printMatrix(predictions, batch_size, model->nClasses);
-            correct = getAccuracy(predictions, train_labels, batch_size, model->nClasses, j);
-            logLoss = crossEntropyLoss(predictions, train_labels, batch_size, model->nClasses, j);
-            printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
-            //compute gradients in forward_pass
-            forward_pass<<<1, 1>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_offsets, batch_size, model->nClasses);
-            // cudaDeviceSynchronize();
-            // ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
-            // cudaDeviceSynchronize();
-            // backward_pass<<<1,1>>>(d_model, batch_size, learning_rate);
-            // cudaDeviceSynchronize();
+            // correct = getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            // logLoss = crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            // printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
+            // printf("Log loss %f\n", logLoss);
+            // //compute gradients in forward_pass
+            backprop<<<1, 1>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
+            // // cudaDeviceSynchronize();
+            // // ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
+            // // cudaDeviceSynchronize();
+            // // backward_pass<<<1,1>>>(d_model, batch_size, learning_rate);
+            // // cudaDeviceSynchronize();
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
         printf("Accuracy: %f%%\n", accuracy*100);
         printf("Log loss: %f\n", logLoss);
     }
-    cudaFree(d_offsets);
     cudaFree(d_model);
     cudaFree(d_inputs);
     cudaFree(d_test_inputs);
     cudaFree(d_outputs);
     cudaFree(d_activations);
     cudaFree(d_test_product);
+    cudaFree(d_deltas);
 }

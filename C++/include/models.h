@@ -17,6 +17,7 @@ struct NeuralNetwork {
     float ** biases;
     float lambda;
     float ** gradients;
+    float ** grad_biases;
 };
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);

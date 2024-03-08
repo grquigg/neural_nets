@@ -21,21 +21,65 @@ __device__ void softmax(float* product, int product_height, int product_width) {
 
     }
 }
+
+__device__ void sigmoid(float* inputs, int size) {
+    for(int i = 0; i < size; i++) {
+        inputs[i] = (1/ (1+exp(-inputs[i])));
+    }
+}
+__device__ void sigmoidD(float* activations, int height, int width, float * delta) {
+    for(int i = 0; i < height; i++) {
+        for(int j = 0; j < width; j++) {
+            delta[i*width+j] *= activations[i*width+j] * (1-activations[i*width+j]);
+        }
+    }
+}
+__device__ float* transposeMatrix(float * matrix, int matrix_height, int matrix_width) {
+    float * transpose = new float[matrix_width*matrix_height];
+    for(int i = 0; i < matrix_height; i++) {
+        for(int j = 0; j < matrix_width; j++) {
+            transpose[i*matrix_width+j] = matrix[j*matrix_height+i];
+            // printf("Valid %d %d %f %f\n", i, j, transpose[i*matrix_width+j], matrix[j*matrix_height+i]);
+        }
+    }
+    return transpose;
+}
+
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
     //initialize the matrix
     //dot product is ALWAYS computed as the rows of the first matrix by the columns of the second matrix
+    if (vector_w != weight_h) {
+        printf("invalid values\n");
+        return;
+    }
     for(int i = 0; i < vector_h; i++) { //for every row in the first matrix
         for(int j = 0; j < weight_w; j++) { //for every column in the second matrix
             product[i*weight_w+j] = 0.0;
             for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
                 product[i*weight_w+j] += inputs[i*vector_w+k] * weights[k*weight_w+j];
+                // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
-            // printf("Temp product: %d %d %f\n", i, j, product[i*weight_w+j]);
-            //printf("%f\n", product[i][j]);
+            // printf("%f\n", product[i*weight_w+j]);
         }
     }
 }
 
+__device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias) {
+    if (vector_w != weight_h) {
+        printf("invalid values\n");
+        return;
+    }
+    for(int i = 0; i < vector_h; i++) { //for every row in the first matrix
+        for(int j = 0; j < weight_w; j++) { //for every column in the second matrix
+            product[i*weight_w+j] = 0.0;
+            for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
+                product[i*weight_w+j] += inputs[i*vector_w+k] * weights[k*weight_w+j];
+
+            }
+            product[i*weight_w+j] += bias[j];
+        }
+    }
+}
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
     //remember that we want the resulting matrix to be of shape [vector_h, weight_w]
     for(int i = 0; i < vector_w; i++) {
@@ -46,6 +90,7 @@ __device__ void dotProductTranspose(float* inputs, float* weights, float * produ
             }
         }
     }
+    printf("End of transpose\n");
 }
 
 __device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float* outVec) {
@@ -156,28 +201,28 @@ __global__ void backward_pass(LogisticRegression* model, int batch_size, float l
 
 ///NEURAL NETWORK CODE
 
-__global__ void predict(NeuralNetwork* model, float* inputs, float* product, int size, int* offsets) {
+__global__ void predict(NeuralNetwork* model, float* inputs, float* product, int* offsets, int size) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int batch = size / (blockDim.x * gridDim.x);
     /*
     Each thread takes a chunk of the input data and feeds it all the way through the neural network, storing the intermediary results in product along the way.
     Just going to use softmax as the default activation as I'm more familiar with how that works anyways
     */
-    dotProduct(inputs+(index*(model->layer_size[0])*batch), model->weights[0], product+index*(model->layer_size[1])*batch, batch, model->layer_size[0], model->layer_size[0], model->layer_size[1]);
-    softmax(product+index*(model->layer_size[1])*batch, batch, (model->layer_size[1]));
-    // printf("Current activation index: %d\n", activation_index);
-    int layer = 0;
-    printf("%f\n", product[0]);
-    for(int j = 1; j < model->nLayers; j++) {
-        printf("Exec %d\n", offsets[j-1]);
-        dotProduct(product+offsets[j-1]+(index*(model->layer_size[j])*batch), model->weights[j], product+offsets[j]+(index*(model->layer_size[j+1])*batch), batch, model->layer_size[j], model->layer_size[j], model->layer_size[j+1]);
-        softmax(product+offsets[j]+(index*(model->layer_size[j+1])*batch), batch, model->layer_size[j+1]);
+    // printf("Result\n");
+    float* input = inputs+(index*(model->layer_size[0])*batch);
+    float* out = product+(index*(model->layer_size[1])*batch);
+    dotProduct(input, model->weights[0], out, batch, model->layer_size[0], model->layer_size[0], model->layer_size[1], model->biases[0]);
+    sigmoid(out, batch*model->layer_size[1]);
+    for(int i = 1; i < model->nLayers; i++) {
+        input = out;
+        out = product+offsets[i]+(index*(model->layer_size[i+1])*batch);
+        dotProduct(input, model->weights[i], out, batch, model->layer_size[i], model->layer_size[i], model->layer_size[i+1], model->biases[i]);
+        sigmoid(out, batch*(model->layer_size[i+1]));
     }
-    printf("Previously %d %f\n", offsets[model->nLayers-1], *(product+offsets[model->nLayers-1]));
     printf("End of predict\n");
 }
 
-__global__ void forward_pass(NeuralNetwork* model, float* inputs, float* outputs, float* activations, int * offsets, int size, int nClasses) {
+__global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int * offsets, int size, int nClasses) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int batch = size / (blockDim.x * gridDim.x);
     /*
@@ -186,22 +231,78 @@ __global__ void forward_pass(NeuralNetwork* model, float* inputs, float* outputs
     /*Step 1: Subtract current predictions from the actual output (same step as in logistic regression)
     But there's a caveat involved in where we actually store the results*/
     int currentLayer = model->nLayers-1;
+    float* current = activations+offsets[currentLayer]+(index*nClasses*batch);
+    float* out = outputs+(index*nClasses*batch);
     // printf("Activation index: %d\n", activation_index + (index*batch));
-    float* current = activations+offsets[currentLayer];
-    float* prev = activations+offsets[currentLayer-1];
-    matrixSubtract(current+(index*nClasses*batch), outputs+(index*nClasses*batch), batch, nClasses, batch, nClasses, current+(index*nClasses*batch));
-    dotProductTranspose(prev+(index*batch*(model->layer_size[currentLayer])), current+(index*nClasses*batch), ((*model).gradients[currentLayer])+(index*(nClasses)*(model->layer_size[currentLayer])), batch, (model->layer_size[currentLayer]), batch, (nClasses));
-    // printMatrix(model->gradients[currentLayer-1]+index*(nClasses)*(model->layer_size[currentLayer]),);
-    currentLayer--;
-    // current = activations[currentLayer];
-    // prev = activations[currentLayer-1];
-    // for(int i = currentLayer; i > 0; i--) {
-    //     //do something else
-    //     printf("Don't call this\n");
-    // }
-    // matrixSubtract(inputs+(index*model->layer_size[0]*batch), current+(index*batch*model->layer_size[0]), batch, model->layer_size[0], batch, model->layer_size[0], current+(index*batch*model->layer_size[0]));
-    // dotProductTranspose(activations+(index*model->layer_size[0]*batch), activations+offsets[i]+(index*model->layer_size[1]*batch), ((*model).gradients[0])+(index*(model->layer_size[0])*(model->layer_size[1])), batch, (model->layer_size[0]), batch, (model->layer_size[1]));
-    // printf("Success of forward pass\n");
+    float* deltaPtr = deltas+offsets[currentLayer]+(index*nClasses*batch);
+    matrixSubtract(current, out, batch, model->layer_size[currentLayer+1], batch, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
+    printf("Delta 4\n");
+    for(int i = 0; i < batch; i++) {
+        for(int j = 0; j < model->layer_size[currentLayer+1]; j++) { //10
+            printf("%f\t", deltaPtr[i*(model->layer_size[currentLayer+1])+j]);
+        }
+        printf("\n");
+    }
+    for(int i = currentLayer; i > 0; i--) {
+        printf("dims %d %d\n", model->layer_size[i], model->layer_size[i+1]);
+        //compute a dot product with
+        //deltas[i] * weights[i].T
+        float *transpose = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
+        dotProduct(deltaPtr, transpose, deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch, model->layer_size[i+1], model->layer_size[i+1],model->layer_size[i]);
+        deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
+        current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
+        sigmoidD(current, batch, model->layer_size[i], deltaPtr);
+        printf("Delta %d\n", i+1);
+        for(int j = 0; j < batch; j++) {
+            for(int k = 0; k < model->layer_size[i]; k++) {
+                printf("%.5f\t", deltaPtr[j*(model->layer_size[i])+k]);
+            }
+            printf("\n");
+        }
+
+        printf("No problems\n");
+        free(transpose);
+        currentLayer--;
+    }
+    currentLayer = model->nLayers-1;
+    float * activationPtr; 
+    for(int i = currentLayer; i >= 1; i--) {
+        deltaPtr = deltas+offsets[i]+(index*model->layer_size[i]*batch);
+        activationPtr = activations+offsets[i-1]+((index*model->layer_size[i-1]*batch)); 
+        printf("Deltas\n");
+        for(int j = 0; j < batch; j++) {
+            for(int k = 0; k < model->layer_size[i+1]; k++) {
+                printf("%.5f\t", deltaPtr[j*(model->layer_size[i+1])+k]);
+            }
+            printf("\n");
+        }
+        printf("Activations\n");
+        for(int j = 0; j < batch; j++) {
+            for(int k = 0; k < model->layer_size[i]; k++) {
+                printf("%.5f\t", activationPtr[j*(model->layer_size[i])+k]);
+            }
+            printf("\n");
+        }
+        dotProduct(transposeMatrix(deltaPtr, model->layer_size[i+1], batch), activationPtr, model->gradients[i], model->layer_size[i+1], batch, batch, model->layer_size[i]);
+        printf("Gradient of Theta%d\n", i+1);
+        for(int j = 0; j < model->layer_size[i]; j++) {
+            for(int k = 0; k < model->layer_size[i+1]; k++) {
+                printf("%.5f\t", model->gradients[i][j*(model->layer_size[i+1])+k]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+    deltaPtr = deltas;
+    dotProduct(transposeMatrix(inputs, model->layer_size[0], batch), deltaPtr, model->gradients[0], model->layer_size[0], batch, batch, model->layer_size[1]);
+    printf("Gradients\n");
+    for(int i = 0; i < model->nLayers; i++) {
+        printf("Gradient %d\n", i+1);
+        for(int j = 0; j < model->layer_size[i]*model->layer_size[i+1]; j++) {
+            printf("%f\t", model->gradients[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 __global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
