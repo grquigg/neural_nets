@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     int BATCH_SIZE = 2;
     int nEpochs = 1;
     float learning_rate = 0.01;
-    int nWorkers = 1;
+    int nWorkers = 4;
     int nThreadsPerWorker = 1;
 
     //read in input file
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
     for(int i = 1; i < model->nLayers+1; i++) {
         // model->weights[i-1] = initializeFlatRandomArray(model->layer_size[i-1], model->layer_size[i]);
         // model->biases[i-1] = initializeFlatRandomArray(1, model->layer_size[i]);
-        model->grad_biases[i-1] = (float*)malloc(model->layer_size[i]);
+        model->grad_biases[i-1] = (float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i]);
         model->gradients[i-1] =(float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]);
     }
     //pass training function

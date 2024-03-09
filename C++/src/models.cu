@@ -66,7 +66,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         cudaMemcpy(temp_biases[i-1], model->biases[i-1], model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMalloc(&temp_grad_biases[i-1], model->layer_size[i]*sizeof(float));
+        cudaMalloc(&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
     }
     cudaMalloc(&d_gradients, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_gradients, temp_gradients, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
@@ -265,7 +265,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 
         for(int j = 0; j < batch_size; j+=batch_size) {
             //pass inputs through the network
-            predict<<<1,1>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
+            predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
             // cudaDeviceSynchronize();
             float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
@@ -278,7 +278,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
             // printf("Log loss %f\n", logLoss);
             // //compute gradients in forward_pass
-            backprop<<<1, 1>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
+            backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
             // // cudaDeviceSynchronize();
             // // ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             // // cudaDeviceSynchronize();
