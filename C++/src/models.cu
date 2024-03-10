@@ -201,16 +201,12 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 
     //convert labels to one hot encoding
     float * one_hot = (float *)malloc(sizeof(float) * total_size * model->nClasses);
-    // for (int i = 0; i < total_size; i++) {
-    //     for(int j = 0; j < model->nClasses; j++) {
-    //         one_hot[i*model->nClasses+j] = 0;
-    //     }
-    //     one_hot[i*(model->nClasses)+train_labels[i][0]] = 1.0;
-    // }
-    one_hot[0] = 0.75;
-    one_hot[1] = 0.98;
-    one_hot[2] = 0.75;
-    one_hot[3] = 0.28;
+    for (int i = 0; i < total_size; i++) {
+        for(int j = 0; j < model->nClasses; j++) {
+            one_hot[i*model->nClasses+j] = 0;
+        }
+        one_hot[i*(model->nClasses)+train_labels[i][0]] = 1.0;
+    }
     //pass labels to GPU
     float *d_outputs = transferMatrixToDevice(one_hot, total_size, model->nClasses);
 
@@ -273,23 +269,28 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
                 printf("Activations at layer %d\n", k);
                 printMatrix(predictions+offsets[k], batch_size, model->layer_size[k+1]);
             }
-            // correct = getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            // logLoss = crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            // printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
-            // printf("Log loss %f\n", logLoss);
+            correct = getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            logLoss = crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
+            printf("Log loss %f\n", logLoss);
             // //compute gradients in forward_pass
             backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
-            // // cudaDeviceSynchronize();
-            // // ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
-            // // cudaDeviceSynchronize();
-            // // backward_pass<<<1,1>>>(d_model, batch_size, learning_rate);
-            // // cudaDeviceSynchronize();
+            cudaDeviceSynchronize();
+            ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
+            cudaDeviceSynchronize();
+            // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets);
+            // cudaDeviceSynchronize();
+            auditGradients<<<1,1>>>(d_model);
+            cudaDeviceSynchronize();
+            backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
+            cudaDeviceSynchronize();
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
         printf("Accuracy: %f%%\n", accuracy*100);
         printf("Log loss: %f\n", logLoss);
     }
+    printf("Finished training\n");
     cudaFree(d_model);
     cudaFree(d_inputs);
     cudaFree(d_test_inputs);

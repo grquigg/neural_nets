@@ -57,9 +57,9 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
             product[i*weight_w+j] = 0.0;
             for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
                 product[i*weight_w+j] += inputs[i*vector_w+k] * weights[k*weight_w+j];
-                printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
+                // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
-            printf("%f\n", product[i*weight_w+j]);
+            // printf("%f\n", product[i*weight_w+j]);
         }
     }
 }
@@ -90,7 +90,6 @@ __device__ void dotProductTranspose(float* inputs, float* weights, float * produ
             }
         }
     }
-    printf("End of transpose\n");
 }
 
 __device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float* outVec) {
@@ -206,25 +205,24 @@ __global__ void predict(NeuralNetwork* model, float* inputs, float* product, int
     float items = size / (float) (blockDim.x * gridDim.x);
     int batch = ceil(items);
     if (index * batch >= size) {
-        printf("Nothing to do here\n");
         return;
     }
     /*
     Each thread takes a chunk of the input data and feeds it all the way through the neural network, storing the intermediary results in product along the way.
     Just going to use softmax as the default activation as I'm more familiar with how that works anyways
     */
-    // printf("Result\n");
     float* input = inputs+(index*(model->layer_size[0])*batch);
+    int batch_size = min(size-(index*batch), batch);
+    printf("batch size: %d\n", batch_size);
     float* out = product+(index*(model->layer_size[1])*batch);
-    dotProduct(input, model->weights[0], out, batch, model->layer_size[0], model->layer_size[0], model->layer_size[1], model->biases[0]);
-    sigmoid(out, batch*model->layer_size[1]);
+    dotProduct(input, model->weights[0], out, batch_size, model->layer_size[0], model->layer_size[0], model->layer_size[1], model->biases[0]);
+    sigmoid(out, batch_size*model->layer_size[1]);
     for(int i = 1; i < model->nLayers; i++) {
         input = out;
         out = product+offsets[i]+(index*(model->layer_size[i+1])*batch);
-        dotProduct(input, model->weights[i], out, batch, model->layer_size[i], model->layer_size[i], model->layer_size[i+1], model->biases[i]);
-        sigmoid(out, batch*(model->layer_size[i+1]));
+        dotProduct(input, model->weights[i], out, batch_size, model->layer_size[i], model->layer_size[i], model->layer_size[i+1], model->biases[i]);
+        softmax(out, batch_size, (model->layer_size[i+1]));
     }
-    printf("End of predict\n");
 }
 
 __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int * offsets, int size, int nClasses) {
@@ -232,7 +230,6 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     float items = size / (float) (blockDim.x * gridDim.x);
     int batch = ceil(items);
     if (index * batch >= size) {
-        printf("Nothing to do here\n");
         return;
     }
     /*
@@ -244,18 +241,19 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     float* current = activations+offsets[currentLayer]+(index*nClasses*batch);
     float* out = outputs+(index*nClasses*batch);
     // printf("Activation index: %d\n", activation_index + (index*batch));
-    printf("offsets %d\n", offsets[currentLayer]+(index*nClasses*batch));
+    // printf("offsets %d\n", offsets[currentLayer]+(index*nClasses*batch));
     float* deltaPtr = deltas+offsets[currentLayer]+(index*nClasses*batch);
-
+    int batch_size = min(size-(index*batch), batch);
     //compute deltas for the last layer
-    matrixSubtract(current, out, batch, model->layer_size[currentLayer+1], batch, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
-    printf("Delta 4\n");
-    for(int i = 0; i < batch; i++) {
-        for(int j = 0; j < model->layer_size[currentLayer+1]; j++) { //10
-            printf("Delta %d %d %f\t", index, j, deltaPtr[i*(model->layer_size[currentLayer+1])+j]);
-        }
-        printf("\n");
-    }
+    // printf("Batch size: %d %d\n", index, batch_size);
+    matrixSubtract(current, out, batch_size, model->layer_size[currentLayer+1], batch_size, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
+    // printf("Delta 4\n");
+    // for(int i = 0; i < batch_size; i++) {
+    //     for(int j = 0; j < model->layer_size[currentLayer+1]; j++) { //10
+    //         printf("Delta %d %d %f\n", index, j, deltaPtr[i*(model->layer_size[currentLayer+1])+j]);
+    //     }
+    //     printf("\n");
+    // }
 
     //compute gradients of the last layer biases
     int bias_index = model->layer_size[currentLayer+1]*index;
@@ -264,46 +262,42 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         model->grad_biases[currentLayer][bias_index+j] = 0.0;
         // printf("Index for current: %d\n", bias_index+j);
         // printf("Bias for current %f\n", model->grad_biases[currentLayer][bias_index+j]);
-        for(int i = 0; i < batch; i++) {
+        for(int i = 0; i < batch_size; i++) {
             // printf("Delta ptr %d %d %f\n", index, i, deltaPtr[i*model->layer_size[currentLayer+1]+j]);
             model->grad_biases[currentLayer][bias_index+j] += deltaPtr[i*model->layer_size[currentLayer+1]+j];
         }
-        printf("Grad bias at %d %d %f\n", index, j, model->grad_biases[currentLayer][bias_index+j]);
+        // printf("Grad bias at %d %d %f\n", index, bias_index+j, model->grad_biases[currentLayer][bias_index+j]);
     }
-
     //main loop
     for(int i = currentLayer; i > 0; i--) {
-        printf("dims %d %d\n", model->layer_size[i], model->layer_size[i+1]);
+        // printf("dims %d %d\n", model->layer_size[i], model->layer_size[i+1]);
         //compute a delta[i-1] as the dot product of deltas[i] * weights[i].T
-        float *transpose = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
-        dotProduct(deltaPtr, transpose, deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch, model->layer_size[i+1], model->layer_size[i+1],model->layer_size[i]);
+        dotProduct(deltaPtr, transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]), deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i+1], model->layer_size[i]);
         //helper variables to organize information better
         deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
         current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
 
         //mulitply delta by the derivative of the sigmoid function
-        sigmoidD(current, batch, model->layer_size[i], deltaPtr);
+        sigmoidD(current, batch_size, model->layer_size[i], deltaPtr);
 
-        printf("Delta %d\n", i+1);
-        for(int j = 0; j < batch; j++) {
-            for(int k = 0; k < model->layer_size[i]; k++) {
-                printf("%.5f\t", deltaPtr[j*(model->layer_size[i])+k]);
-            }
-            printf("\n");
-        }
+        // printf("Delta %d\n", i+1);
+        // for(int j = 0; j < batch_size; j++) {
+        //     for(int k = 0; k < model->layer_size[i]; k++) {
+        //         printf("Delta %d %d %d %.5f\n", i, index, j*(model->layer_size[i])+k, deltaPtr[j*(model->layer_size[i])+k]);
+        //     }
+        //     printf("\n");
+        // }
 
         //compute gradients with respect to the biases
         bias_index = model->layer_size[i]*index;
         for(int j = 0; j < model->layer_size[i]; j++) {
-            printf("Index %d\n", bias_index+j);
+            // printf("Index %d\n", bias_index+j);
             model->grad_biases[i-1][bias_index+j] = 0.0;
-            for(int k = 0; k < batch; k++) {
+            for(int k = 0; k < batch_size; k++) {
                 model->grad_biases[i-1][bias_index+j] += deltaPtr[k*(model->layer_size[i])+j];
             }
-            printf("Grad bias at %d %d %f\n", index, j, model->grad_biases[i-1][bias_index+j]);
+            // printf("Grad bias at %d %d %f\n", index, j, model->grad_biases[i-1][bias_index+j]);
         }
-        printf("No problems\n");
-        free(transpose);
         currentLayer--;
     }
     currentLayer = model->nLayers-1;
@@ -312,60 +306,126 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         deltaPtr = deltas+offsets[i]+(index*model->layer_size[i+1]*batch);
         // print("Activation offset")
         activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
-        printf("Deltas\n");
-        for(int j = 0; j < batch; j++) {
-            for(int k = 0; k < model->layer_size[i+1]; k++) {
-                printf("%.5f\t", deltaPtr[j*(model->layer_size[i+1])+k]);
-            }
-            printf("\n");
-        }
-        printf("Activations\n");
-        for(int j = 0; j < batch; j++) {
-            for(int k = 0; k < model->layer_size[i]; k++) {
-                printf("%.5f\t", activationPtr[j*(model->layer_size[i])+k]);
-            }
-            printf("\n");
-        }
+        // printf("Deltas\n");
+        // for(int j = 0; j < batch; j++) {
+        //     for(int k = 0; k < model->layer_size[i+1]; k++) {
+        //         printf("%.5f\t", deltaPtr[j*(model->layer_size[i+1])+k]);
+        //     }
+        //     printf("\n");
+        // }
+        // printf("Activations\n");
+        // for(int j = 0; j < batch; j++) {
+        //     for(int k = 0; k < model->layer_size[i]; k++) {
+        //         printf("%.5f\t", activationPtr[j*(model->layer_size[i])+k]);
+        //     }
+        //     printf("\n");
+        // }
         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
-        printf("GRADIENT INDEX for %d: %d\n", index, gradientIndex);
-        dotProduct(transposeMatrix(activationPtr, model->layer_size[i], batch), deltaPtr, model->gradients[i]+gradientIndex, model->layer_size[i], batch, batch, model->layer_size[i+1]);
-        printf("Gradient of Theta%d\n", i+1);
-        for(int j = 0; j < model->layer_size[i]; j++) {
-            for(int k = 0; k < model->layer_size[i+1]; k++) {
-                // printf("Index for %d: %d\n", index, gradientIndex+j*(model->layer_size[i+1])+k);
-                printf("Index: %d %.5f\t\n", gradientIndex+j*(model->layer_size[i+1])+k, model->gradients[i][gradientIndex+j*(model->layer_size[i+1])+k]);
-            }
-            printf("End of %d\n", j);
-        }
-        printf("\n");
+        // printf("GRADIENT INDEX for %d: %d\n", index, gradientIndex);
+        dotProduct(transposeMatrix(activationPtr, model->layer_size[i], batch_size), deltaPtr, model->gradients[i]+gradientIndex, model->layer_size[i], batch_size, batch_size, model->layer_size[i+1]);
+        // printf("Gradient of Theta%d\n", i+1);
+        // for(int j = 0; j < model->layer_size[i]; j++) {
+        //     for(int k = 0; k < model->layer_size[i+1]; k++) {
+        //         // printf("Index for %d: %d\n", index, gradientIndex+j*(model->layer_size[i+1])+k);
+        //         // printf("Gradient: %d %d %.5f\t\n", index, gradientIndex+j*(model->layer_size[i+1])+k, model->gradients[i][gradientIndex+j*(model->layer_size[i+1])+k]);
+        //     }
+        // }
+        // printf("\n");
     }
     deltaPtr = deltas+(index*model->layer_size[1]*batch);
     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
-    dotProduct(transposeMatrix(inputs, model->layer_size[0], batch), deltaPtr, model->gradients[0]+gradientIndex, model->layer_size[0], batch, batch, model->layer_size[1]);
-    printf("Gradients\n");
+    dotProduct(transposeMatrix(inputs+(model->layer_size[0]*batch*index), model->layer_size[0], batch_size), deltaPtr, model->gradients[0]+gradientIndex, model->layer_size[0], batch_size, batch_size, model->layer_size[1]);
+    // printf("Gradients\n");
+    // for(int i = 0; i < model->nLayers; i++) {
+    //     printf("Gradient %d\n", i+1);
+    //     for(int j = 0; j < model->layer_size[i]*model->layer_size[i+1]; j++) {
+    //         printf("%f\t", model->gradients[i][gradientIndex+j]);
+    //     }
+    //     printf("\n");
+    // }
+}
+
+__global__ void auditDeltas(NeuralNetwork* model, float * deltas, int* offsets) {
     for(int i = 0; i < model->nLayers; i++) {
-        printf("Gradient %d\n", i+1);
-        for(int j = 0; j < model->layer_size[i]*model->layer_size[i+1]*batch; j++) {
-            printf("%f\t", model->gradients[i][j]);
+        printf("Deltas for layer %d\n", i);
+        float* deltaPtr;
+        deltaPtr = deltas+offsets[i];
+        for(int j = 0; j < model->layer_size[i]; j++) {
+            for(int k = 0; k < model->layer_size[i+1]-1; k++) {
+                printf("%f\t", deltaPtr[j*model->layer_size[i+1]+1]);
+            }
+            printf("%f\n", deltaPtr[(model->layer_size[i+1])*(model->layer_size[i])-1]);
         }
-        printf("\n");
     }
+}
+__global__ void auditGradients(NeuralNetwork* model) {
+    printf("Audit\n");
+    for(int i = 0; i < model->nLayers; i++) {
+        printf("Gradients for weights %d\n", i);
+        for(int j = 0; j < model->layer_size[i]; j++) {
+            for(int k = 0; k < model->layer_size[i+1]-1; k++) {
+                printf("%f\t", model->gradients[i][(j*model->layer_size[i+1])+k]);
+            }
+            printf("%f\n", model->gradients[i][(j+1)*model->layer_size[i+1]-1]);
+        }
+
+        printf("Gradients for biases %d\n", i);
+        for(int j = 0; j < model->layer_size[i+1]-1; j++) {
+            printf("%f\t", model->grad_biases[i][j]);
+        }
+        printf("%f\n", model->grad_biases[i][model->layer_size[i+1]-1]);
+    }
+    printf("Success\n");
 }
 
 __global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     for(int i = 0; i < model->nLayers; i++) {
+
+        //reduce gradients[i]
         int step_size = (model->layer_size[i] * model->layer_size[i+1]);
-        int batch = (model->layer_size[i] * model->layer_size[i+1]) /(blockDim.x * gridDim.x);
+        float step = (step_size) /(float) (blockDim.x * gridDim.x);
+        int batch = ceil(step);
+        // printf("Batch size for index %d of gradients %d: %d\n", index, i, batch);
         int start = index*batch;
+        if(start >= step_size) {
+            return;
+        }
         int end = (index+1)*batch;
+        if(end > step_size) {
+            printf("START: %d %d %d\n", start, batch, min(start+batch, step_size));
+        }
 
         for(int j = 1; j < total_steps; j++) {
-            for(int k = start; k < end; k++) {
+            for(int k = start; k < min(start+batch, step_size); k++) {
+                // if(min(start+batch, step_size) == step_size) {
+                //     printf("DROP\n");
+                // }
                 // printf("Entry %d %d\n", j, k);
                 model->gradients[i][k] += model->gradients[i][k+(j*step_size)];
             }
         }
+        // for(int k = start; k < end; k++) {
+        //     printf("Gradient w.r.t. weights at %d %d %f\n", i, k, model->gradients[i][k]);
+        // }
+
+        //reduce biases[i]
+        step_size = model->layer_size[i+1];
+        step = step_size / (float) (blockDim.x * gridDim.x);
+        batch = ceil(step);
+        start = index*batch;
+        if(start >= step_size) {
+            return;
+        }
+        for(int j = 1; j < total_steps; j++) {
+            for(int k = start; k < min(start+batch, step_size); k++) {
+                // printf("Entry %d %d\n", j, k);
+                model->grad_biases[i][k] += model->grad_biases[i][k+(j*step_size)];
+            }
+        }
+        // for(int k = start; k < min(start+batch, step_size); k++) {
+        //     printf("Gradient w.r.t. bias at %d %d %f\n", i, k, model->grad_biases[i][k]);
+        // }
     }
 }
 
@@ -374,12 +434,32 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
     //BATCH_SIZE*n_classes length vector
     for(int k = 0; k < model->nLayers; k++) {
         // printf("Layer %d\n", k);
-        int batch = (model->layer_size[k] * model->layer_size[k+1]) /(blockDim.x * gridDim.x);
+        int size = (model->layer_size[k] * model->layer_size[k+1]);
+        float step = size / (float) (blockDim.x * gridDim.x);
+        int batch = ceil(step);
         int start = index*batch;
-        for(int i = 0; i < batch; i++) {
-            printf("Gradient at %d %d %f\n", k, i, (*model).gradients[k][start+i]);
-            (*model).gradients[k][start+i] *= (learning_rate / batch_size);
-            (*model).weights[k][start+i] -=  (*model).gradients[k][start+i];
+        // printf("Gradients for")
+        // printf("Starting index %d %d %d\n", k, index, start);
+        if(start >= size) {
+            return;
+        }
+        for(int i = start; i < min(start+batch, size); i++) {
+            (*model).gradients[k][i] *= (learning_rate / (float) (batch_size));
+            (*model).weights[k][i] -=  (*model).gradients[k][i];
+            // printf("WEIGHT AT %d %d: %f\n", k, i, (*model).weights[k][i]);
+        }
+
+        size = model->layer_size[k+1];
+        step = size / (float) (blockDim.x * gridDim.x);
+        batch = ceil(step);
+        start = index*batch;
+        if(start >= size) {
+            return;
+        }
+        for(int i = start; i < min(start+batch, size); i++) {
+            // printf("Entry %d %d\n", j, k);
+            model->grad_biases[k][i] *= (learning_rate / (float) (batch_size));
+            model->biases[k][i] -= model->grad_biases[k][i];
         }
     }
     // printf("Finish backward\n");

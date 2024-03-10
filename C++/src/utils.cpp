@@ -36,7 +36,7 @@ float* initializeFlatRandomArray(int mat_height, int mat_width) {
         for(int j = 0; j < mat_width; j++) {
             // arr[(i*mat_width)+j] = 1/(float) ((i*mat_width)+j+1);
             // arr[(i*mat_width)+j] = (float)rand()/(float)(RAND_MAX/a);
-            arr[(i*mat_width)+j]=0.25;
+            arr[(i*mat_width)+j]=0.01;
         }
     }
     return arr;
