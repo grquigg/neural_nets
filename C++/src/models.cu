@@ -46,6 +46,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     NeuralNetwork* d_model;
     int * nLayers;
     float **d_weights;
+    float **d_weights_t;
     float **d_biases;
     float **d_gradients;
     float **d_grad_biases;
@@ -56,6 +57,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     // // cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     // cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
     float **temp_weights = new float*[model->nLayers];
+    float **temp_weights_t = new float*[model->nLayers];
     float **temp_biases = new float*[model->nLayers];
     float **temp_gradients = new float*[model->nLayers];
     float **temp_grad_biases = new float*[model->nLayers];
@@ -65,6 +67,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         cudaMalloc(&temp_biases[i-1], model->layer_size[i]*sizeof(float));
         cudaMemcpy(temp_biases[i-1], model->biases[i-1], model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
+        cudaMalloc(&temp_weights_t[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
     }
@@ -76,11 +79,14 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_weights, temp_weights, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_weights_t, (model->nLayers)*sizeof(float*));
+    cudaMemcpy(d_weights_t, temp_weights_t, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     NeuralNetwork temp = *model;
     temp.nClasses = model->nClasses;
     temp.nLayers = model->nLayers;
     temp.layer_size = nLayers;
     temp.weights = d_weights;
+    temp.weight_transpose = d_weights_t;
     temp.gradients = d_gradients;
     temp.biases = d_biases;
     temp.grad_biases = d_grad_biases;
@@ -259,36 +265,54 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         logLoss = 0;
         accuracy = 0.0;
 
-        for(int j = 0; j < batch_size; j+=batch_size) {
+        for(int j = 0; j < 1000; j+=batch_size) {
             //pass inputs through the network
+            setTranspose<<<1,1>>>(d_model);
+            cudaDeviceSynchronize();
+            auto startForward = std::chrono::system_clock::now();
             predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
-            // cudaDeviceSynchronize();
+            cudaDeviceSynchronize();
+            auto endForward = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_forward = endForward - startForward;
+            std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
             float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
             // for(int k = 0; k < model->nLayers; k++) {
             //     printf("Activations at layer %d\n", k);
             //     printMatrix(predictions+offsets[k], batch_size, model->layer_size[k+1]);
             // }
-            correct = getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            logLoss = crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
-            printf("Log loss %f\n", logLoss);
+            correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            // printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
+            // printf("Log loss %f\n", logLoss);
             // //compute gradients in forward_pass
+            auto startBackward = std::chrono::system_clock::now();
             backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
             cudaDeviceSynchronize();
+            auto endBackward = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_backward = endBackward - startBackward;
+            std::cout << "Finished backward pass in " << elapsed_backward.count() << " seconds" << std::endl;
+            auto startReduce = std::chrono::system_clock::now();
             ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             cudaDeviceSynchronize();
+            auto endReduce = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_reduce = endReduce - startReduce;
+            std::cout << "Finished ring reduce in " << elapsed_reduce.count() << " seconds" << std::endl;
             // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
             // cudaDeviceSynchronize();
             // auditGradients<<<1,1>>>(d_model);
             // cudaDeviceSynchronize();
+            auto startUpdate = std::chrono::system_clock::now();
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             cudaDeviceSynchronize();
+            auto endUpdate = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
+            std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
-        // printf("Accuracy: %f%%\n", accuracy*100);
-        // printf("Log loss: %f\n", logLoss);
+        printf("Accuracy: %f%%\n", accuracy*100);
+        printf("Log loss: %f\n", logLoss);
     }
     auto endTrain = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_forward = endTrain - startTrain;

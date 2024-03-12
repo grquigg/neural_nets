@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
     model->layer_size[1] = 800;
     model->layer_size[2] = 10;
     model->weights = (float**)malloc((model->nLayers)*sizeof(float*));
+    model->weight_transpose = (float**)malloc((model->nLayers)*sizeof(float*));
     model->biases = (float**)malloc((model->nLayers)*sizeof(float*));
     model->gradients = (float**)malloc((model->nLayers)*sizeof(float*));
     model->grad_biases =(float**)malloc((model->nLayers)*sizeof(float*));
@@ -117,6 +118,7 @@ int main(int argc, char** argv) {
     // model->biases[2][1] = 0.17;
     for(int i = 1; i < model->nLayers+1; i++) {
         model->weights[i-1] = initializeFlatRandomArray(model->layer_size[i-1], model->layer_size[i]);
+        model->weight_transpose[i-1] = initializeFlatRandomArray(model->layer_size[i], model->layer_size[i-1]);
         model->biases[i-1] = initializeFlatRandomArray(1, model->layer_size[i]);
         model->grad_biases[i-1] = (float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i]);
         model->gradients[i-1] =(float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]);

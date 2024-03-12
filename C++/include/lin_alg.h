@@ -25,6 +25,8 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
 //we can't unneccessarily waste memory on the GPU so I have to get creative and take a second attempt at writing the modified dotProduct function
 __device__ float* transposeMatrix(float * matrix, int matrix_height, int matrix_width);
 
+__global__ void setTranspose(NeuralNetwork* model);
+
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
 //////////GLOBALS////////

@@ -199,6 +199,11 @@ __global__ void backward_pass(LogisticRegression* model, int batch_size, float l
 }
 
 ///NEURAL NETWORK CODE
+__global__ void setTranspose(NeuralNetwork* model) {
+    for(int i = 1; i < model->nLayers; i++) {
+        model->weight_transpose[i] = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
+    }
+}
 
 __global__ void predict(NeuralNetwork* model, float* inputs, float* product, int* offsets, int size) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -250,21 +255,12 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     // }
     //compute deltas for the last layer
     matrixSubtract(current, out, batch_size, model->layer_size[currentLayer+1], batch_size, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
-    // printf("Delta 4\n");
-    // for(int i = 0; i < batch_size; i++) {
-    //     for(int j = 0; j < model->layer_size[currentLayer+1]; j++) { //10
-    //         printf("Delta %d %d %f\n", index, j, deltaPtr[i*(model->layer_size[currentLayer+1])+j]);
-    //     }
-    //     printf("\n");
-    // }
 
     // //compute gradients of the last layer biases
     int bias_index = model->layer_size[currentLayer+1]*index;
     // printf("Bias index %d\n", bias_index);
     for(int j = 0; j < model->layer_size[currentLayer+1]; j++) {
         model->grad_biases[currentLayer][bias_index+j] = 0.0;
-        // printf("Index for current: %d\n", bias_index+j);
-        // printf("Bias for current %f\n", model->grad_biases[currentLayer][bias_index+j]);
         for(int i = 0; i < batch_size; i++) {
             // printf("Delta ptr %d %d %f\n", index, i, deltaPtr[i*model->layer_size[currentLayer+1]+j]);
             model->grad_biases[currentLayer][bias_index+j] += deltaPtr[i*model->layer_size[currentLayer+1]+j];
@@ -276,10 +272,8 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         // printf("dims %d %d\n", model->layer_size[i], model->layer_size[i+1]);
         //compute a delta[i-1] as the dot product of deltas[i] * weights[i].T
         // printf("Here is a problem %d\n", index);
-        transpose = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
-        dotProduct(deltaPtr, transpose, deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i+1], model->layer_size[i]);
+        dotProduct(deltaPtr, model->weight_transpose[i], deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i+1], model->layer_size[i]);
         // printf("No problem %d\n", index);
-        free(transpose);
         //helper variables to organize information better
         deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
         current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
