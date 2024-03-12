@@ -278,10 +278,10 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             cudaDeviceSynchronize();
             ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             cudaDeviceSynchronize();
-            // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets);
+            // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
             // cudaDeviceSynchronize();
-            auditGradients<<<1,1>>>(d_model);
-            cudaDeviceSynchronize();
+            // auditGradients<<<1,1>>>(d_model);
+            // cudaDeviceSynchronize();
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             cudaDeviceSynchronize();
         }

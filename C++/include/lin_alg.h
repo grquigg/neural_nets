@@ -58,5 +58,5 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
 
 __global__ void auditGradients(NeuralNetwork* model);
 
-__global__ void auditDeltas(NeuralNetwork* model, float* deltas, int* offsets);
+__global__ void auditDeltas(NeuralNetwork* model, float* deltas, int* offsets, int batches, int batch_size);
 #endif
