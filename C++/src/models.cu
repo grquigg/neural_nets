@@ -265,10 +265,10 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // cudaDeviceSynchronize();
             float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
-            for(int k = 0; k < model->nLayers; k++) {
-                printf("Activations at layer %d\n", k);
-                printMatrix(predictions+offsets[k], batch_size, model->layer_size[k+1]);
-            }
+            // for(int k = 0; k < model->nLayers; k++) {
+            //     printf("Activations at layer %d\n", k);
+            //     printMatrix(predictions+offsets[k], batch_size, model->layer_size[k+1]);
+            // }
             correct = getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             logLoss = crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
@@ -278,10 +278,10 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             cudaDeviceSynchronize();
             ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             cudaDeviceSynchronize();
-            // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
-            // cudaDeviceSynchronize();
-            // auditGradients<<<1,1>>>(d_model);
-            // cudaDeviceSynchronize();
+            auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
+            cudaDeviceSynchronize();
+            auditGradients<<<1,1>>>(d_model);
+            cudaDeviceSynchronize();
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             cudaDeviceSynchronize();
         }
