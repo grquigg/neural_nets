@@ -279,6 +279,7 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         transpose = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
         dotProduct(deltaPtr, transpose, deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i+1], model->layer_size[i]);
         // printf("No problem %d\n", index);
+        free(transpose);
         //helper variables to organize information better
         deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
         current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
@@ -313,11 +314,14 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         // print("Activation offset")
         activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
-        dotProduct(transposeMatrix(activationPtr, model->layer_size[i], batch_size), deltaPtr, model->gradients[i]+gradientIndex, model->layer_size[i], batch_size, batch_size, model->layer_size[i+1]);
+        transpose = transposeMatrix(activationPtr, model->layer_size[i], batch_size);
+        dotProduct(transpose, deltaPtr, model->gradients[i]+gradientIndex, model->layer_size[i], batch_size, batch_size, model->layer_size[i+1]);
+        free(transpose);
     }
     deltaPtr = deltas+(index*model->layer_size[1]*batch);
     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
-    dotProduct(transposeMatrix(inputs+(model->layer_size[0]*batch*index), model->layer_size[0], batch_size), deltaPtr, model->gradients[0]+gradientIndex, model->layer_size[0], batch_size, batch_size, model->layer_size[1]);
+    transpose = transposeMatrix(inputs+(model->layer_size[0]*batch*index), model->layer_size[0], batch_size);
+    dotProduct(transpose, deltaPtr, model->gradients[0]+gradientIndex, model->layer_size[0], batch_size, batch_size, model->layer_size[1]);
     free(transpose);
 }
 

@@ -253,7 +253,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     int correct = 0;
     double logLoss = 0.0;
     float accuracy = 0.0;
-    std::cout << "Fine" << std::endl;
+    auto startTrain = std::chrono::system_clock::now();
     for(int i = 0; i < nEpochs; i++) {
         correct = 0;
         logLoss = 0;
@@ -278,19 +278,21 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             cudaDeviceSynchronize();
             ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             cudaDeviceSynchronize();
-            auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
-            cudaDeviceSynchronize();
-            auditGradients<<<1,1>>>(d_model);
-            cudaDeviceSynchronize();
+            // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
+            // cudaDeviceSynchronize();
+            // auditGradients<<<1,1>>>(d_model);
+            // cudaDeviceSynchronize();
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             cudaDeviceSynchronize();
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
-        printf("Accuracy: %f%%\n", accuracy*100);
-        printf("Log loss: %f\n", logLoss);
+        // printf("Accuracy: %f%%\n", accuracy*100);
+        // printf("Log loss: %f\n", logLoss);
     }
-    printf("Finished training\n");
+    auto endTrain = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_forward = endTrain - startTrain;
+    std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
     cudaFree(d_model);
     cudaFree(d_inputs);
     cudaFree(d_test_inputs);
