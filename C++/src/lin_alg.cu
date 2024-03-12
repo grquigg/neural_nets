@@ -276,12 +276,7 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         // printf("dims %d %d\n", model->layer_size[i], model->layer_size[i+1]);
         //compute a delta[i-1] as the dot product of deltas[i] * weights[i].T
         // printf("Here is a problem %d\n", index);
-        transpose = new float[model->layer_size[i+1]*model->layer_size[i]];
-        for(int j = 0; j < model->layer_size[i+1]; j++) {
-            for(int k = 0; k < model->layer_size[i]; k++) {
-                transpose[j*model->layer_size[i]+k] = model->weights[i][k*model->layer_size[i+1]+j];
-            }
-        }
+        transpose = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
         dotProduct(deltaPtr, transpose, deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i+1], model->layer_size[i]);
         // printf("No problem %d\n", index);
         //helper variables to organize information better
