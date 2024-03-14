@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     int numClasses = 10;
     int BATCH_SIZE = std::stoi(argv[7]);
     int nEpochs = 100;
-    float learning_rate = 0.01;
+    float learning_rate = 0.1;
     int nWorkers = std::stoi(argv[5]);
     int nThreadsPerWorker = std::stoi(argv[6]);
 

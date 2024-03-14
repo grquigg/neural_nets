@@ -1,5 +1,6 @@
 #include "../include/utils.h"
 #include "../include/models.h"
+#include "../include/lin_alg.h"
 #include <chrono> 
 #include <iostream>
 
@@ -264,9 +265,9 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         logLoss = 0;
         accuracy = 0.0;
 
-        for(int j = 0; j < 8192; j+=batch_size) {
+        for(int j = 0; j < batch_size; j+=batch_size) {
             //pass inputs through the network
-            printf("BATCH AT %d\n", j);
+            // printf("BATCH AT %d\n", j);
             setTranspose<<<1,1>>>(d_model);
             cudaDeviceSynchronize();
             auto startForward = std::chrono::system_clock::now();
@@ -277,6 +278,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
             float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+            // printMatrix(predictions+offsets[1], batch_size, model->nClasses);
             correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             // printf("Accuracy: %f%%\n", correct / (float) (j+batch_size)* 100);
@@ -305,7 +307,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
             // std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
         }
-        accuracy = correct / (float) total_size;
+        accuracy = correct / (float) batch_size;
         printf("End of epoch %d\n", i+1);
         printf("Accuracy: %f%%\n", accuracy*100);
         printf("Log loss: %f\n", logLoss);

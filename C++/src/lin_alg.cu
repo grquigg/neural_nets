@@ -24,7 +24,7 @@ __device__ void softmax(float* product, int product_height, int product_width) {
 
 __device__ void sigmoid(float* inputs, int size) {
     for(int i = 0; i < size; i++) {
-        inputs[i] = (1/ (1+exp(-inputs[i])));
+        inputs[i] = (1/ (1+expf(-inputs[i])));
     }
 }
 __device__ void sigmoidD(float* activations, int height, int width, float * delta) {
@@ -233,7 +233,7 @@ __global__ void predict(NeuralNetwork* model, float* inputs, float* product, int
     float* input = inputs+(index*(model->layer_size[0])*batch);
     int batch_size = min(size-(index*batch), batch);
     // printf("batch size: %d\n", batch_size);
-    float* out = product+(index*(model->layer_size[1])*batch);
+    float* out = (product+(index*(model->layer_size[1])*batch));
     dotProduct(input, model->weights[0], out, batch_size, model->layer_size[0], model->layer_size[0], model->layer_size[1], model->biases[0]);
     sigmoid(out, batch_size*model->layer_size[1]);
     for(int i = 1; i < model->nLayers; i++) {
@@ -263,7 +263,6 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     // printf("offsets %d\n", offsets[currentLayer]+(index*nClasses*batch));
     float* deltaPtr = deltas+offsets[currentLayer]+(index*nClasses*batch);
     int batch_size = min(size-(index*batch), batch);
-    float * transpose;
     // if(batch_size != batch) {
     //     printf("Batch size: %d %d\n", index, batch_size);
     // }
@@ -322,15 +321,12 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         // print("Activation offset")
         activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
-        transpose = transposeMatrix(activationPtr, model->layer_size[i], batch_size);
-        dotProduct(transpose, deltaPtr, model->gradients[i]+gradientIndex, model->layer_size[i], batch_size, batch_size, model->layer_size[i+1]);
+        dotProductTranspose(activationPtr, deltaPtr, model->gradients[i]+gradientIndex, batch_size, model->layer_size[i], batch_size, model->layer_size[i+1]);
     }
     deltaPtr = deltas+(index*model->layer_size[1]*batch);
     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
-    transpose = transposeMatrix(inputs+(model->layer_size[0]*batch*index), model->layer_size[0], batch_size);
-    dotProduct(transpose, deltaPtr, model->gradients[0]+gradientIndex, model->layer_size[0], batch_size, batch_size, model->layer_size[1]);
+    dotProductTranspose(inputs+(model->layer_size[0]*batch*index), deltaPtr, model->gradients[0]+gradientIndex, batch_size, model->layer_size[0], batch_size, model->layer_size[1]);
     __syncthreads();
-    free(transpose);
 }
 
 __global__ void auditDeltas(NeuralNetwork* model, float * deltas, int* offsets, int batches, int batch_size) {
@@ -432,7 +428,7 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
             return;
         }
         for(int i = start; i < min(start+batch, size); i++) {
-            (*model).gradients[k][i] *= (learning_rate / (float) (batch_size));
+            (*model).gradients[k][i] *= (learning_rate) / (float) batch_size;
             (*model).weights[k][i] -=  (*model).gradients[k][i];
             // printf("WEIGHT AT %d %d: %f\n", k, i, (*model).weights[k][i]);
         }
@@ -446,7 +442,7 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
         }
         for(int i = start; i < min(start+batch, size); i++) {
             // printf("Entry %d %d\n", j, k);
-            model->grad_biases[k][i] *= (learning_rate / (float) (batch_size));
+            model->grad_biases[k][i] *= (learning_rate) / (float) batch_size;
             model->biases[k][i] -= model->grad_biases[k][i];
         }
     }
