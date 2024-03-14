@@ -80,8 +80,10 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
         }
     }
 }
+
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
     //remember that we want the resulting matrix to be of shape [vector_h, weight_w]
+    if(vector_h == weight_h) {
     for(int i = 0; i < vector_w; i++) {
         for(int j = 0; j < weight_w; j++) {
             product[i*weight_w+j] = 0.0;
@@ -89,6 +91,18 @@ __device__ void dotProductTranspose(float* inputs, float* weights, float * produ
                 product[i*weight_w+j] += inputs[k*vector_w+i] * weights[k*weight_w+j];
             }
         }
+    }
+    } else if(vector_w == weight_w) {
+        for(int i = 0; i < vector_h; i++) {
+            for(int j = 0; j < weight_h; j++) {
+                product[i*weight_h+j] = 0.0;
+                for(int k = 0; k < vector_w; k++) {
+                    product[i*weight_h+j] += inputs[i*vector_w+k] * weights[j*weight_w+k];
+                }
+            }
+        }
+    } else {
+        printf("INVALID DIMS FOR DOT PRODUCT\n");
     }
 }
 
@@ -310,12 +324,12 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
         transpose = transposeMatrix(activationPtr, model->layer_size[i], batch_size);
         dotProduct(transpose, deltaPtr, model->gradients[i]+gradientIndex, model->layer_size[i], batch_size, batch_size, model->layer_size[i+1]);
-        free(transpose);
     }
     deltaPtr = deltas+(index*model->layer_size[1]*batch);
     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
     transpose = transposeMatrix(inputs+(model->layer_size[0]*batch*index), model->layer_size[0], batch_size);
     dotProduct(transpose, deltaPtr, model->gradients[0]+gradientIndex, model->layer_size[0], batch_size, batch_size, model->layer_size[1]);
+    __syncthreads();
     free(transpose);
 }
 
@@ -366,7 +380,6 @@ __global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
         if(start >= step_size) {
             return;
         }
-        int end = (index+1)*batch;
         // if(end > step_size) {
         //     printf("START: %d %d %d\n", start, batch, min(start+batch, step_size));
         // }

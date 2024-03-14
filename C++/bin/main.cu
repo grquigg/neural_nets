@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     // std::string nThreads_arg = argv[6];
     int numClasses = 10;
     int BATCH_SIZE = std::stoi(argv[7]);
-    int nEpochs = 10;
+    int nEpochs = 100;
     float learning_rate = 0.01;
     int nWorkers = std::stoi(argv[5]);
     int nThreadsPerWorker = std::stoi(argv[6]);
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     model->lambda = 1.0;
     model->layer_size = (int*)malloc((model->nLayers+1)*sizeof(int));
     model->layer_size[0] = 784;
-    model->layer_size[1] = 800;
+    model->layer_size[1] = 64;
     model->layer_size[2] = 10;
     model->weights = (float**)malloc((model->nLayers)*sizeof(float*));
     model->weight_transpose = (float**)malloc((model->nLayers)*sizeof(float*));

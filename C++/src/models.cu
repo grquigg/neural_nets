@@ -1,5 +1,4 @@
 #include "../include/utils.h"
-#include "../include/lin_alg.h"
 #include "../include/models.h"
 #include <chrono> 
 #include <iostream>
@@ -265,39 +264,36 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         logLoss = 0;
         accuracy = 0.0;
 
-        for(int j = 0; j < 1000; j+=batch_size) {
+        for(int j = 0; j < 8192; j+=batch_size) {
             //pass inputs through the network
+            printf("BATCH AT %d\n", j);
             setTranspose<<<1,1>>>(d_model);
             cudaDeviceSynchronize();
             auto startForward = std::chrono::system_clock::now();
             predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
             cudaDeviceSynchronize();
-            auto endForward = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_forward = endForward - startForward;
-            std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
+            // auto endForward = std::chrono::system_clock::now();
+            // std::chrono::duration<double> elapsed_forward = endForward - startForward;
+            // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
             float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
-            // for(int k = 0; k < model->nLayers; k++) {
-            //     printf("Activations at layer %d\n", k);
-            //     printMatrix(predictions+offsets[k], batch_size, model->layer_size[k+1]);
-            // }
             correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            // printf("Accuracy: %f%%\n", correct / (float) batch_size * 100);
+            // printf("Accuracy: %f%%\n", correct / (float) (j+batch_size)* 100);
             // printf("Log loss %f\n", logLoss);
             // //compute gradients in forward_pass
-            auto startBackward = std::chrono::system_clock::now();
+            // auto startBackward = std::chrono::system_clock::now();
             backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
             cudaDeviceSynchronize();
-            auto endBackward = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_backward = endBackward - startBackward;
-            std::cout << "Finished backward pass in " << elapsed_backward.count() << " seconds" << std::endl;
-            auto startReduce = std::chrono::system_clock::now();
+            // auto endBackward = std::chrono::system_clock::now();
+            // // std::chrono::duration<double> elapsed_backward = endBackward - startBackward;
+            // // std::cout << "Finished backward pass in " << elapsed_backward.count() << " seconds" << std::endl;
+            // // auto startReduce = std::chrono::system_clock::now();
             ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             cudaDeviceSynchronize();
-            auto endReduce = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_reduce = endReduce - startReduce;
-            std::cout << "Finished ring reduce in " << elapsed_reduce.count() << " seconds" << std::endl;
+            // auto endReduce = std::chrono::system_clock::now();
+            // std::chrono::duration<double> elapsed_reduce = endReduce - startReduce;
+            // std::cout << "Finished ring reduce in " << elapsed_reduce.count() << " seconds" << std::endl;
             // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
             // cudaDeviceSynchronize();
             // auditGradients<<<1,1>>>(d_model);
@@ -305,9 +301,9 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             auto startUpdate = std::chrono::system_clock::now();
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             cudaDeviceSynchronize();
-            auto endUpdate = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
-            std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
+            // auto endUpdate = std::chrono::system_clock::now();
+            // std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
+            // std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
@@ -317,6 +313,15 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     auto endTrain = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_forward = endTrain - startTrain;
     std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
+    for(int i = 1; i < model->nLayers+1; i++) {
+        cudaFree(d_model->weights[i-1]);
+        cudaFree(d_model->biases[i-1]);
+        cudaFree(d_model->gradients[i-1]);
+        cudaFree(d_model->weight_transpose[i-1]);
+        // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
+        cudaFree(d_model->grad_biases[i-1]);
+    }
+    cudaFree(d_model->layer_size);
     cudaFree(d_model);
     cudaFree(d_inputs);
     cudaFree(d_test_inputs);
@@ -324,4 +329,6 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     cudaFree(d_activations);
     cudaFree(d_test_product);
     cudaFree(d_deltas);
+    
+    
 }
