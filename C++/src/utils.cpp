@@ -21,8 +21,8 @@ std::vector<float> initializeRandomArray(int mat_height, int mat_width) {
     int a = 1;
     for (int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
-            weights[i*mat_width+j] = (float)rand()/(float)(RAND_MAX/a);
-            // weights[i*mat_width+j] = 0.25;
+            // weights[i*mat_width+j] = (float)rand()/(float)(RAND_MAX/a);
+            weights[i*mat_width+j] = 0.01;
             //the most important line in the entire program
         }
     }
@@ -35,8 +35,8 @@ float* initializeFlatRandomArray(int mat_height, int mat_width) {
     for(int i = 0; i < mat_height; i++) {
         for(int j = 0; j < mat_width; j++) {
             // arr[(i*mat_width)+j] = 1/(float) ((i*mat_width)+j+1);
-            arr[(i*mat_width)+j] = ((float)rand()/(float)(RAND_MAX/a))*0.01;
-            // arr[(i*mat_width)+j]=0.01;
+            // arr[(i*mat_width)+j] = ((float)rand()/(float)(RAND_MAX/a))*0.01;
+            arr[(i*mat_width)+j]=0.01;
         }
     }
     return arr;
@@ -94,19 +94,15 @@ int getAccuracy(float* predicted, std::vector<std::vector<int>> actual, int heig
     for (int i = 0; i < height; i++) {
         max = 0;
         max_score = 0.0;
-        is_correct = false;
         for (int j = 0; j < width; j++) {
             if (predicted[(i*width)+j] > max_score) {
                 // printf("Called %d %f\n", (i*width)+j, predicted[(i*width)+j]);
                 max = j;
                 max_score = predicted[(i*width)+j];
-                if(is_correct) {
-                    is_correct = false;
-                }
             }
         }
         // printf("Predicted: %d\tActual:%d\n", max, actual[index+i][0]);
-        if ((int) actual[index+i][0] == max || is_correct) {
+        if ((int) actual[index+i][0] == max) {
             correct++;
         }
     }

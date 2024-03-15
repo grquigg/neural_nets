@@ -185,9 +185,7 @@ void train(LogisticRegression *model, float* train_input, std::vector<std::vecto
 
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker) {
-    printf("Train network\n");
     NeuralNetwork *d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
-    std::cout << "TEST SIZE " << test_size << std::endl;
     //copy train data
     float *d_inputs;
     //copy weights
@@ -231,12 +229,11 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     int * offsets = new int[model->nLayers];
     for(int i = 1; i <= model->nLayers; i++) {
         offsets[i-1] = (batch_size * activations_size);
+        // printf("Offset at %d: %d\n", i-1, offsets[i-1]);
         activations_size += model->layer_size[i];
-        printf("Offset at %d %d\n", i-1, offsets[i-1]);
     }
     float * d_activations = new float[batch_size*activations_size];
     float * activations = new float[batch_size*activations_size];
-    printf("Activations size: %d\n", batch_size*activations_size);
     //device pointers
     int * d_offsets;
     cudaMalloc(&d_activations, activations_size*batch_size*sizeof(float));
@@ -265,11 +262,8 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         logLoss = 0;
         accuracy = 0.0;
 
-        for(int j = 0; j < batch_size; j+=batch_size) {
+        for(int j = 0; j < total_size; j+=batch_size) {
             //pass inputs through the network
-            // printf("BATCH AT %d\n", j);
-            setTranspose<<<1,1>>>(d_model);
-            cudaDeviceSynchronize();
             auto startForward = std::chrono::system_clock::now();
             predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
             cudaDeviceSynchronize();
@@ -278,10 +272,9 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
             float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
-            // printMatrix(predictions+offsets[1], batch_size, model->nClasses);
             correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            // printf("Accuracy: %f%%\n", correct / (float) (j+batch_size)* 100);
+            // printf("Accuracy: %f%%\n", correct / (float) (total_size)* 100);
             // printf("Log loss %f\n", logLoss);
             // //compute gradients in forward_pass
             // auto startBackward = std::chrono::system_clock::now();
@@ -303,11 +296,13 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             auto startUpdate = std::chrono::system_clock::now();
             backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             cudaDeviceSynchronize();
+            // auditWeights<<<1,1>>>(d_model);
+            // cudaDeviceSynchronize();
             // auto endUpdate = std::chrono::system_clock::now();
             // std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
             // std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
         }
-        accuracy = correct / (float) batch_size;
+        accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
         printf("Accuracy: %f%%\n", accuracy*100);
         printf("Log loss: %f\n", logLoss);

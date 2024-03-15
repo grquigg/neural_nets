@@ -10,18 +10,19 @@
 
 int main(int argc, char** argv) {
     ////HYPERPARAMS////
-    std::string train_data_path = argv[1];
-    std::string train_label_path = argv[2];
-    std::string test_data_path = argv[3];
-    std::string test_label_path = argv[4];
+    std::string root = argv[1];
+    std::string train_data_path = root + "/train-images.idx3-ubyte";
+    std::string train_label_path = root + "/train-labels.idx1-ubyte";
+    std::string test_data_path = root + "/t10k-images.idx3-ubyte";
+    std::string test_label_path =  root + "/t10k-labels.idx1-ubyte";
     // std::string nWorkers_arg = argv[5];
     // std::string nThreads_arg = argv[6];
     int numClasses = 10;
-    int BATCH_SIZE = std::stoi(argv[7]);
-    int nEpochs = 100;
-    float learning_rate = 0.1;
-    int nWorkers = std::stoi(argv[5]);
-    int nThreadsPerWorker = std::stoi(argv[6]);
+    int BATCH_SIZE = std::stoi(argv[2]);
+    int nEpochs = 1000;
+    float learning_rate = 0.01;
+    int nWorkers = std::stoi(argv[3]);
+    int nThreadsPerWorker = std::stoi(argv[4]);
 
     //read in input file
     std::vector<std::vector<int>> inputs = readDataFromUByteFile(train_data_path);
