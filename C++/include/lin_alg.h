@@ -58,7 +58,10 @@ __global__ void ringReduce(NeuralNetwork* model, const int total_steps);
 
 __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate);
 
+////DEBUGGING FUNCTIONS
 __global__ void auditGradients(NeuralNetwork* model);
 
 __global__ void auditDeltas(NeuralNetwork* model, float* deltas, int* offsets, int batches, int batch_size);
+
+__global__ void auditWeights(NeuralNetwork* model);
 #endif

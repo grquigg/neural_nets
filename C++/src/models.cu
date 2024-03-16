@@ -57,7 +57,6 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     // // cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     // cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
     float **temp_weights = new float*[model->nLayers];
-    float **temp_weights_t = new float*[model->nLayers];
     float **temp_biases = new float*[model->nLayers];
     float **temp_gradients = new float*[model->nLayers];
     float **temp_grad_biases = new float*[model->nLayers];
@@ -67,7 +66,6 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         cudaMalloc(&temp_biases[i-1], model->layer_size[i]*sizeof(float));
         cudaMemcpy(temp_biases[i-1], model->biases[i-1], model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
-        cudaMalloc(&temp_weights_t[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
     }
@@ -79,14 +77,11 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_weights, temp_weights, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_weights_t, (model->nLayers)*sizeof(float*));
-    cudaMemcpy(d_weights_t, temp_weights_t, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     NeuralNetwork temp = *model;
     temp.nClasses = model->nClasses;
     temp.nLayers = model->nLayers;
     temp.layer_size = nLayers;
     temp.weights = d_weights;
-    temp.weight_transpose = d_weights_t;
     temp.gradients = d_gradients;
     temp.biases = d_biases;
     temp.grad_biases = d_grad_biases;
@@ -250,18 +245,20 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
     // float * d_product = transferMatrixToDevice(activations, batch_size, activations_size);
     // //initialize array for storing predictions of test set on host
+    float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
     float * test_predictions = (float*)malloc(test_size*model->nClasses*sizeof(float));
     float * d_test_product = transferMatrixToDevice(test_predictions, test_size, model->nClasses);
     //define metrics
     int correct = 0;
     double logLoss = 0.0;
     float accuracy = 0.0;
+    int totalEpochs = 0;
+    std::cout << "START TRAIN" << std::endl;
     auto startTrain = std::chrono::system_clock::now();
     for(int i = 0; i < nEpochs; i++) {
         correct = 0;
         logLoss = 0;
         accuracy = 0.0;
-
         for(int j = 0; j < total_size; j+=batch_size) {
             //pass inputs through the network
             auto startForward = std::chrono::system_clock::now();
@@ -270,20 +267,15 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // auto endForward = std::chrono::system_clock::now();
             // std::chrono::duration<double> elapsed_forward = endForward - startForward;
             // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
-            float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
             error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
             correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
             logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            // printf("Accuracy: %f%%\n", correct / (float) (total_size)* 100);
-            // printf("Log loss %f\n", logLoss);
+            // printf("Accuracy: %f%%\n", correct / (float) (batch_size)* 100);
+            printf("Log loss %f\n", (logLoss * batch_size)/(float)(j+1));
             // //compute gradients in forward_pass
             // auto startBackward = std::chrono::system_clock::now();
             backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
             cudaDeviceSynchronize();
-            // auto endBackward = std::chrono::system_clock::now();
-            // // std::chrono::duration<double> elapsed_backward = endBackward - startBackward;
-            // // std::cout << "Finished backward pass in " << elapsed_backward.count() << " seconds" << std::endl;
-            // // auto startReduce = std::chrono::system_clock::now();
             ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             cudaDeviceSynchronize();
             // auto endReduce = std::chrono::system_clock::now();
@@ -301,11 +293,11 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             // auto endUpdate = std::chrono::system_clock::now();
             // std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
             // std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
+            totalEpochs++;
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);
         printf("Accuracy: %f%%\n", accuracy*100);
-        printf("Log loss: %f\n", logLoss);
     }
     auto endTrain = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_forward = endTrain - startTrain;
@@ -314,7 +306,6 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         cudaFree(d_model->weights[i-1]);
         cudaFree(d_model->biases[i-1]);
         cudaFree(d_model->gradients[i-1]);
-        cudaFree(d_model->weight_transpose[i-1]);
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaFree(d_model->grad_biases[i-1]);
     }

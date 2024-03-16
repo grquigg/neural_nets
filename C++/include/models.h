@@ -17,7 +17,6 @@ struct NeuralNetwork {
     float ** biases;
     float lambda;
     float ** gradients;
-    float ** weight_transpose;
     float ** grad_biases;
 };
 

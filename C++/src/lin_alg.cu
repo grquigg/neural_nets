@@ -213,11 +213,6 @@ __global__ void backward_pass(LogisticRegression* model, int batch_size, float l
 }
 
 ///NEURAL NETWORK CODE
-__global__ void setTranspose(NeuralNetwork* model) {
-    for(int i = 1; i < model->nLayers; i++) {
-        model->weight_transpose[i] = transposeMatrix(model->weights[i], model->layer_size[i+1], model->layer_size[i]);
-    }
-}
 
 __global__ void predict(NeuralNetwork* model, float* inputs, float* product, int* offsets, int size) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -259,22 +254,10 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     int currentLayer = model->nLayers-1;
     float* current = activations+offsets[currentLayer]+(index*nClasses*batch);
     float* out = outputs+(index*nClasses*batch);
-    // printf("Activation index: %d\n", activation_index + (index*batch));
-    // printf("offsets %d\n", offsets[currentLayer]+(index*nClasses*batch));
     float* deltaPtr = deltas+offsets[currentLayer]+(index*nClasses*batch);
     int batch_size = min(size-(index*batch), batch);
-    // if(batch_size != batch) {
-    //     printf("Batch size: %d %d\n", index, batch_size);
-    // }
     //compute deltas for the last layer;
     matrixSubtract(current, out, batch_size, model->layer_size[currentLayer+1], batch_size, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
-    // for(int i = 0; i < batch_size; i++) {
-    //     for(int j = 0; j < model->layer_size[currentLayer+1]; j++) {
-    //         printf("%f\t", deltaPtr[i*model->layer_size[currentLayer+1]+j]);
-    //     }
-    //     printf("\n");
-    // }
-    // //compute gradients of the last layer biases
     int bias_index = model->layer_size[currentLayer+1]*index;
     // printf("Bias index %d\n", bias_index);
     for(int j = 0; j < model->layer_size[currentLayer+1]; j++) {
@@ -286,41 +269,26 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     }
     // //main loop
     for(int i = currentLayer; i > 0; i--) {
-        //compute a delta[i-1] as the dot product of deltas[i] * weights[i].T
-        // printf("Here is a problem %d\n", index);
         dotProductTranspose(deltaPtr, model->weights[i], deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i], model->layer_size[i+1]);
-        // printf("No problem %d\n", index);
-        //helper variables to organize information better
         deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
         current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
 
         //mulitply delta by the derivative of the sigmoid function
-        // sigmoidD(current, batch_size, model->layer_size[i], deltaPtr);
-
-        // printf("Delta %d\n", i+1);
-        // for(int j = 0; j < batch_size; j++) {
-        //     for(int k = 0; k < model->layer_size[i]; k++) {
-        //         printf("Delta %d %d %d %.5f\n", i, index, j*(model->layer_size[i])+k, deltaPtr[j*(model->layer_size[i])+k]);
-        //     }
-        //     printf("\n");
-        // }
+        sigmoidD(current, batch_size, model->layer_size[i], deltaPtr);
 
         //compute gradients with respect to the biases
         bias_index = model->layer_size[i]*index;
         for(int j = 0; j < model->layer_size[i]; j++) {
-            // printf("Index %d\n", bias_index+j);
             model->grad_biases[i-1][bias_index+j] = 0.0;
             for(int k = 0; k < batch_size; k++) {
                 model->grad_biases[i-1][bias_index+j] += deltaPtr[k*(model->layer_size[i])+j];
             }
-            // printf("Grad bias at %d %d %f\n", index, j, model->grad_biases[i-1][bias_index+j]);
         }
     }
     currentLayer = model->nLayers-1;
     float * activationPtr; 
     for(int i = currentLayer; i > 0; i--) {
         deltaPtr = deltas+offsets[i]+(index*model->layer_size[i+1]*batch);
-        // print("Activation offset")
         activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
         dotProductTranspose(activationPtr, deltaPtr, model->gradients[i]+gradientIndex, batch_size, model->layer_size[i], batch_size, model->layer_size[i+1]);
@@ -328,7 +296,6 @@ __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, fl
     deltaPtr = deltas+(index*model->layer_size[1]*batch);
     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
     dotProductTranspose(inputs+(model->layer_size[0]*batch*index), deltaPtr, model->gradients[0]+gradientIndex, batch_size, model->layer_size[0], batch_size, model->layer_size[1]);
-    __syncthreads();
 }
 
 __global__ void auditDeltas(NeuralNetwork* model, float * deltas, int* offsets, int batches, int batch_size) {
@@ -388,22 +355,11 @@ __global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
         if(start >= step_size) {
             return;
         }
-        // if(end > step_size) {
-        //     printf("START: %d %d %d\n", start, batch, min(start+batch, step_size));
-        // }
-
         for(int j = 1; j < total_steps; j++) {
             for(int k = start; k < min(start+batch, step_size); k++) {
-                // if(min(start+batch, step_size) == step_size) {
-                //     printf("DROP\n");
-                // }
-                // printf("Entry %d %d\n", j, k);
                 model->gradients[i][k] += model->gradients[i][k+(j*step_size)];
             }
         }
-        // for(int k = start; k < end; k++) {
-        //     printf("Gradient w.r.t. weights at %d %d %f\n", i, k, model->gradients[i][k]);
-        // }
 
         //reduce biases[i]
         step_size = model->layer_size[i+1];
@@ -419,9 +375,6 @@ __global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
                 model->grad_biases[i][k] += model->grad_biases[i][k+(j*step_size)];
             }
         }
-        // for(int k = start; k < min(start+batch, step_size); k++) {
-        //     printf("Gradient w.r.t. bias at %d %d %f\n", i, k, model->grad_biases[i][k]);
-        // }
     }
 }
 
