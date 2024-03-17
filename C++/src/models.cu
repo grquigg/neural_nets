@@ -3,6 +3,7 @@
 #include "../include/lin_alg.h"
 #include <chrono> 
 #include <iostream>
+#include <cublas_v2.h>
 
 float* transferMatrixToDevice(float *matrix, int height, int width) {
     float* deviceMatrix;

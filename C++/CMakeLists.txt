@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(NEURAL_NET VERSION 1.0)
+project(NEURAL_NET VERSION 1.0 LANGUAGES CXX CUDA)
 
 # Set include directories
 message("--Source directory: ${NEURAL_NET_SOURCE_DIR}")
 include_directories(${NEURAL_NET_SOURCE_DIR}/include)
 
 # Get CPP files
-file(GLOB SRC ${NEURAL_NET_SOURCE_DIR}/src/*cpp)
+file(GLOB SRC ${NEURAL_NET_SOURCE_DIR}/src/*cpp ${NEURAL_NET_SOURCE_DIR}/src/*cu)
 message("--src: ${SRC}")
 
 # Get executable files
-file(GLOB EXECLIST ${NEURAL_NET_SOURCE_DIR}/bin/*cpp)
+file(GLOB EXECLIST ${NEURAL_NET_SOURCE_DIR}/bin/main.cu ${NEURAL_NET_SOURCE_DIR}/bin/tests.cu)
 message("--Exec List: ${EXECLIST}")
 
 ###############
@@ -52,7 +52,13 @@ foreach(EXEC ${EXECLIST})
     message("${EXECNAME}")
     message("${LIBNAME}")
     target_link_libraries(${EXECNAME} LINK_PUBLIC ${LIBNAME})
+
+    set_target_properties(${EXECNAME} PROPERTIES
+                      CUDA_SEPARABLE_COMPILATION ON)
+
+    set_property(TARGET ${EXECNAME} PROPERTY CUDA_ARCHITECTURES 50 72)
   endif()
 
   message("-- Adding executable: ${EXECNAME}")
 endforeach(EXEC)
+set_property(TARGET Neural_Net PROPERTY CUDA_ARCHITECTURES 50 72)
