@@ -36,7 +36,7 @@ The order of the arguments that should be passed into the train function are as 
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker);
 
-void predict(NeuralNetwork* model, float* inputs, float* activations,  int* offsets, int size, cublasHandle_t handle);
+__global__ void predict(NeuralNetwork* model, float* inputs, float* activations,  int* offsets, int size, cublasHandle_t handle);
 
 __global__ void ringReduce(NeuralNetwork* model, const int total_steps);
 

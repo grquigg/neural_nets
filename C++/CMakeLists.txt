@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(NEURAL_NET VERSION 1.0 LANGUAGES CXX CUDA)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 enable_testing()
-
+find_package(mathdx REQUIRED COMPONENTS cublasdx CONFIG PATHS "C:/Users/grego/Downloads/nvidia-cublasdx-24.01.0/nvidia-mathdx-24.01.0/nvidia/mathdx/24.01")
 find_package(CUDA)
 include_directories(${CUDA_INCLUDE_DIRS})
 
@@ -19,9 +22,6 @@ file(GLOB EXECLIST ${NEURAL_NET_SOURCE_DIR}/bin/*.cu ${NEURAL_NET_SOURCE_DIR}/bi
 message("--Exec List: ${EXECLIST}")
 
 ####Google Test #####
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -73,13 +73,14 @@ foreach(EXEC ${EXECLIST})
     message("EXEC ${EXECNAME}")
     target_link_libraries(${EXECNAME} LINK_PUBLIC ${LIBNAME} ${CUDA_LIBRARIES} cublas)
 
-    set_property(TARGET ${EXECNAME} PROPERTY CUDA_ARCHITECTURES 50 72)
+    set_property(TARGET ${EXECNAME} PROPERTY CUDA_ARCHITECTURES 72)
   endif()
 
   message("-- Adding executable: ${EXECNAME}")
 endforeach(EXEC)
-set_property(TARGET Neural_Net PROPERTY CUDA_ARCHITECTURES 50 72)
+set_property(TARGET Neural_Net PROPERTY CUDA_ARCHITECTURES 72)
 target_compile_options(Neural_Net PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-rdc=true>)
+target_link_libraries(Neural_Net mathdx::cublasdx)
 set_target_properties(Neural_Net PROPERTIES
                       CUDA_SEPARABLE_COMPILATION ON
                       CUDA_RESOLVE_DEVICE_SYMBOLS ON)

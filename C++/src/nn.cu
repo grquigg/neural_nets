@@ -3,6 +3,12 @@
 #include "../include/lin_alg.h"
 #include <chrono> 
 #include <cublas_v2.h>
+#include <cublasdx.hpp>
+using namespace cublasdx;
+
+constexpr auto t_mode = cublasdx::transpose_mode::non_transposed;
+
+using GEMM = decltype(Size<32 /* M */, 32 /* N */, 32 /* K */>() + Precision<double>() + Type<type::real>() + TransposeMode<t_mode /* A */, t_mode /* B */>() + Function<function::MM>());
 
 NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
     NeuralNetwork* d_model;
@@ -13,8 +19,8 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     float **d_gradients;
     float **d_grad_biases;
     //allocate all of the memory that we need to CUDA
-    cudaMalloc(&d_model, sizeof(NeuralNetwork));
-    cudaMalloc(&nLayers, (model->nLayers+1)*sizeof(int));
+    cudaMalloc((void**)&d_model, sizeof(NeuralNetwork));
+    cudaMalloc((void**)&nLayers, (model->nLayers+1)*sizeof(int));
     cudaMemcpy(nLayers, model->layer_size, (model->nLayers+1)*sizeof(int), cudaMemcpyHostToDevice);
     // // cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     // cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
@@ -23,21 +29,21 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     float **temp_gradients = new float*[model->nLayers];
     float **temp_grad_biases = new float*[model->nLayers];
     for(int i = 1; i < model->nLayers+1; i++) {
-        cudaMalloc(&temp_weights[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
+        cudaMalloc((void**)&temp_weights[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         cudaMemcpy(temp_weights[i-1], model->weights[i-1], model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMalloc(&temp_biases[i-1], model->layer_size[i]*sizeof(float));
+        cudaMalloc((void**)&temp_biases[i-1], model->layer_size[i]*sizeof(float));
         cudaMemcpy(temp_biases[i-1], model->biases[i-1], model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMalloc(&temp_gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
+        cudaMalloc((void**)&temp_gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float));
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMalloc(&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
+        cudaMalloc((void**)&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
     }
-    cudaMalloc(&d_gradients, (model->nLayers)*sizeof(float*));
+    cudaMalloc((void**)&d_gradients, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_gradients, temp_gradients, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_grad_biases, (model->nLayers)*sizeof(float*));
+    cudaMalloc((void**)&d_grad_biases, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_grad_biases, temp_grad_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
+    cudaMalloc((void**)&d_biases, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
+    cudaMalloc((void**)&d_weights, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_weights, temp_weights, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     NeuralNetwork temp = *model;
     temp.nClasses = model->nClasses;
@@ -63,7 +69,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     cudaError_t error;
     float *d_inputs;
     //copy weights
-    error = cudaMalloc(&d_inputs, total_size*(model->layer_size[0])*sizeof(float));
+    error = cudaMalloc((void**)&d_inputs, total_size*(model->layer_size[0])*sizeof(float));
     if(error != cudaSuccess) {
         std::cout << "Problem with copying" << std::endl;
     }
@@ -73,7 +79,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     }
     //copy test data
     float *d_test_inputs;
-    cudaMalloc(&d_test_inputs, test_size*(model->layer_size[0])*sizeof(float));
+    cudaMalloc((void**)&d_test_inputs, test_size*(model->layer_size[0])*sizeof(float));
     cudaMemcpy(d_test_inputs, test_input, test_size*(model->layer_size[0])*sizeof(float), cudaMemcpyHostToDevice);
 
     //convert labels to one hot encoding
@@ -109,8 +115,8 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     float * activations = new float[batch_size*activations_size];
     //device pointers
     int * d_offsets;
-    cudaMalloc(&d_activations, activations_size*batch_size*sizeof(float));
-    cudaMalloc(&d_offsets, model->nLayers*sizeof(int));
+    cudaMalloc((void**)&d_activations, activations_size*batch_size*sizeof(float));
+    cudaMalloc((void**)&d_offsets, model->nLayers*sizeof(int));
     for(int i = 0; i < activations_size*batch_size; i++) {
         activations[i] = 1;
     }
@@ -119,7 +125,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 
     //deltas
     float * d_deltas = new float[batch_size*activations_size];
-    cudaMalloc(&d_deltas, activations_size*batch_size*sizeof(float));
+    cudaMalloc((void**)&d_deltas, activations_size*batch_size*sizeof(float));
     cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
     // float * d_product = transferMatrixToDevice(activations, batch_size, activations_size);
     // //initialize array for storing predictions of test set on host
@@ -199,7 +205,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     
 }
 
-void predict(NeuralNetwork* model, float* inputs, float* product, int* offsets, int size, cublasHandle_t handle) {
+__global__ void predict(NeuralNetwork* model, float* inputs, float* product, int* offsets, int size, cublasHandle_t handle) {
     int batch = size;
     int index = 0;
     // if (index * batch >= size) {
@@ -211,10 +217,8 @@ void predict(NeuralNetwork* model, float* inputs, float* product, int* offsets, 
     */
     float alpha = 1.0f;
     float beta = 0.0f;
-    printf("Okay\n");
     //args are as follows: handle, transa, transb, #rows in input, #cols in model->weights[0], #rows in model->weights[0], &alpha, inputs, size, model
-    cublasStatus_t error = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, size, model->layer_size[1], model->layer_size[0], &alpha, inputs, size, model->weights[0], model->layer_size[0], &beta, product, size);
-    printf("ERROR: %d\n", error);
+    // cublasStatus_t error = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, size, model->layer_size[1], model->layer_size[0], &alpha, inputs, size, model->weights[0], model->layer_size[0], &beta, product, size);
     cudaDeviceSynchronize();
     printf("Success\n");
     // sigmoid(out, batch_size*model->layer_size[1]);
@@ -329,74 +333,74 @@ __global__ void auditWeights(NeuralNetwork* model) {
     }
 }
 
-__global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
-    int index = blockIdx.x*blockDim.x + threadIdx.x;
-    for(int i = 0; i < model->nLayers; i++) {
-
-        //reduce gradients[i]
-        int step_size = (model->layer_size[i] * model->layer_size[i+1]);
-        float step = (step_size) /(float) (blockDim.x * gridDim.x);
-        int batch = ceil(step);
-        // printf("Batch size for index %d of gradients %d: %d\n", index, i, batch);
-        int start = index*batch;
-        if(start >= step_size) {
-            return;
-        }
-        for(int j = 1; j < total_steps; j++) {
-            for(int k = start; k < min(start+batch, step_size); k++) {
-                model->gradients[i][k] += model->gradients[i][k+(j*step_size)];
-            }
-        }
-
-        //reduce biases[i]
-        step_size = model->layer_size[i+1];
-        step = step_size / (float) (blockDim.x * gridDim.x);
-        batch = ceil(step);
-        start = index*batch;
-        if(start >= step_size) {
-            return;
-        }
-        for(int j = 1; j < total_steps; j++) {
-            for(int k = start; k < min(start+batch, step_size); k++) {
-                // printf("Entry %d %d\n", j, k);
-                model->grad_biases[i][k] += model->grad_biases[i][k+(j*step_size)];
-            }
-        }
-    }
-}
-
-__global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate) {
-    int index = blockIdx.x*blockDim.x + threadIdx.x;
-    //BATCH_SIZE*n_classes length vector
-    for(int k = 0; k < model->nLayers; k++) {
-        // printf("Layer %d\n", k);
-        int size = (model->layer_size[k] * model->layer_size[k+1]);
-        float step = size / (float) (blockDim.x * gridDim.x);
-        int batch = ceil(step);
-        int start = index*batch;
-        // printf("Gradients for")
-        // printf("Starting index %d %d %d\n", k, index, start);
-        if(start >= size) {
-            return;
-        }
-        for(int i = start; i < min(start+batch, size); i++) {
-            (*model).gradients[k][i] *= (learning_rate) / (float) batch_size;
-            (*model).weights[k][i] -=  (*model).gradients[k][i];
-            // printf("WEIGHT AT %d %d: %f\n", k, i, (*model).weights[k][i]);
-        }
-
-        size = model->layer_size[k+1];
-        step = size / (float) (blockDim.x * gridDim.x);
-        batch = ceil(step);
-        start = index*batch;
-        if(start >= size) {
-            return;
-        }
-        for(int i = start; i < min(start+batch, size); i++) {
-            // printf("Entry %d %d\n", j, k);
-            model->grad_biases[k][i] *= (learning_rate) / (float) batch_size;
-            model->biases[k][i] -= model->grad_biases[k][i];
-        }
-    }
-    // printf("Finish backward\n");
-}
+//__global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
+//    int index = blockIdx.x*blockDim.x + threadIdx.x;
+//    for(int i = 0; i < model->nLayers; i++) {
+//
+//        //reduce gradients[i]
+//        int step_size = (model->layer_size[i] * model->layer_size[i+1]);
+//        float step = (step_size) /(float) (blockDim.x * gridDim.x);
+//        int batch = ceil(step);
+//        // printf("Batch size for index %d of gradients %d: %d\n", index, i, batch);
+//        int start = index*batch;
+//        if(start >= step_size) {
+//            return;
+//        }
+//        for(int j = 1; j < total_steps; j++) {
+//            for(int k = start; k < min(start+batch, step_size); k++) {
+//                model->gradients[i][k] += model->gradients[i][k+(j*step_size)];
+//            }
+//        }
+//
+//        //reduce biases[i]
+//        step_size = model->layer_size[i+1];
+//        step = step_size / (float) (blockDim.x * gridDim.x);
+//        batch = ceil(step);
+//        start = index*batch;
+//        if(start >= step_size) {
+//            return;
+//        }
+//        for(int j = 1; j < total_steps; j++) {
+//            for(int k = start; k < min(start+batch, step_size); k++) {
+//                // printf("Entry %d %d\n", j, k);
+//                model->grad_biases[i][k] += model->grad_biases[i][k+(j*step_size)];
+//            }
+//        }
+//    }
+//}
+//
+//__global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate) {
+//    int index = blockIdx.x*blockDim.x + threadIdx.x;
+//    //BATCH_SIZE*n_classes length vector
+//    for(int k = 0; k < model->nLayers; k++) {
+//        // printf("Layer %d\n", k);
+//        int size = (model->layer_size[k] * model->layer_size[k+1]);
+//        float step = size / (float) (blockDim.x * gridDim.x);
+//        int batch = ceil(step);
+//        int start = index*batch;
+//        // printf("Gradients for")
+//        // printf("Starting index %d %d %d\n", k, index, start);
+//        if(start >= size) {
+//            return;
+//        }
+//        for(int i = start; i < min(start+batch, size); i++) {
+//            (*model).gradients[k][i] *= (learning_rate) / (float) batch_size;
+//            (*model).weights[k][i] -=  (*model).gradients[k][i];
+//            // printf("WEIGHT AT %d %d: %f\n", k, i, (*model).weights[k][i]);
+//        }
+//
+//        size = model->layer_size[k+1];
+//        step = size / (float) (blockDim.x * gridDim.x);
+//        batch = ceil(step);
+//        start = index*batch;
+//        if(start >= size) {
+//            return;
+//        }
+//        for(int i = start; i < min(start+batch, size); i++) {
+//            // printf("Entry %d %d\n", j, k);
+//            model->grad_biases[k][i] *= (learning_rate) / (float) batch_size;
+//            model->biases[k][i] -= model->grad_biases[k][i];
+//        }
+//    }
+//    // printf("Finish backward\n");
+//}

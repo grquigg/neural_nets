@@ -1,6 +1,6 @@
 #ifndef LIN_ALG_H
 #define LIN_ALG_H
-
+#include <cuda_runtime.h>
 #include <vector>
 //////////DEVICES/GENERAL LINEAR ALGEBRA FUNCTIONS////////
 
