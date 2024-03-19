@@ -2,15 +2,15 @@
 #include <cassert>
 #include <string>
 #include <vector>
-// #include "utils.h"
 #include "../include/utils.h"
 #include "../include/lin_alg.h"
-#include "../include/models.h"
+#include "../include/nn.h"
 #include <chrono> 
 
 int main(int argc, char** argv) {
     ////HYPERPARAMS////
-    std::string root = argv[1];
+    std::cout << "Hello" << std::endl;
+    std::string root = "../../../../mnist";
     std::string train_data_path = root + "/train-images.idx3-ubyte";
     std::string train_label_path = root + "/train-labels.idx1-ubyte";
     std::string test_data_path = root + "/t10k-images.idx3-ubyte";
@@ -18,11 +18,11 @@ int main(int argc, char** argv) {
     // std::string nWorkers_arg = argv[5];
     // std::string nThreads_arg = argv[6];
     int numClasses = 10;
-    int BATCH_SIZE = std::stoi(argv[2]);
+    int BATCH_SIZE = 10;
     int nEpochs = 250;
     float learning_rate = 0.025;
-    int nWorkers = std::stoi(argv[3]);
-    int nThreadsPerWorker = std::stoi(argv[4]);
+    int nWorkers = 10;
+    int nThreadsPerWorker = 10;
 
     //read in input file
     std::vector<std::vector<int>> inputs = readDataFromUByteFile(train_data_path);

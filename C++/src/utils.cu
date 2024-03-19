@@ -45,6 +45,9 @@ float* initializeFlatRandomArray(int mat_height, int mat_width) {
 std::vector<std::vector<int>> readDataFromUByteFile(std::string filePath) {
     std::ifstream input(filePath, std::ios::binary);
     //load all bytes into a buffer
+    if (!input) {
+        std::cout << "FILE NOT FOUND" << std::endl;
+    }
     std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(input), {});
     //first two bytes are zero, so we take the third byte and assert that it's eight
     int buffer_ptr = 0;
@@ -127,4 +130,13 @@ double crossEntropyLoss(float* predicted, std::vector<std::vector<int>>& actual,
         }
     }
     return log_sum;
+}
+
+float* transferMatrixToDevice(float *matrix, int height, int width) {
+    float* deviceMatrix;
+    cudaMalloc(&deviceMatrix, height*width*sizeof(float));
+    for(int i = 0; i < height; i++) {
+        cudaMemcpy(deviceMatrix+(i*width), matrix+(i*width), sizeof(float)*width, cudaMemcpyHostToDevice);
+    }
+    return deviceMatrix;
 }

@@ -18,4 +18,6 @@ void printMatrix(std::vector<float> arr, int height, int width);
 int getAccuracy(float* predicted, std::vector<std::vector<int>> actual, int height, int width, int index);
 
 double crossEntropyLoss(float* predicted, std::vector<std::vector<int>>& actual, int height, int width, int index);
+
+float* transferMatrixToDevice(float *matrix, int height, int width);
 #endif

@@ -1,13 +1,8 @@
-#ifndef MODELS_H
-#define MODELS_H
-struct LogisticRegression {
-    int nFeatures;
-    int nClasses;
-    float * weights;
-    float * bias;
-    float lambda;
-    float * gradients;
-};
+#ifndef NN_H
+#define NN_H
+#include <vector>
+#include <iostream>
+#include <cublas_v2.h>
 
 struct NeuralNetwork {
     int nClasses;
@@ -20,10 +15,8 @@ struct NeuralNetwork {
     float ** grad_biases;
 };
 
-LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
-
 NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker);
-void copyDataToGPU(float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, int total_size, int test_size, int nClasses);
+
 /*
 The order of the arguments that should be passed into the train function are as follows:
 1. Reference to the HOST model struct
@@ -39,9 +32,22 @@ The order of the arguments that should be passed into the train function are as 
 10. number of desired workers
 11. number of threads per worker
 */
-void train(LogisticRegression *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
-int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker);
 
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker);
+
+void predict(NeuralNetwork* model, float* inputs, float* activations,  int* offsets, int size, cublasHandle_t handle);
+
+__global__ void ringReduce(NeuralNetwork* model, const int total_steps);
+
+__global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate);
+
+__global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int* offsets, int size, int nClasses);
+////DEBUGGING FUNCTIONS
+__global__ void auditGradients(NeuralNetwork* model);
+
+__global__ void auditDeltas(NeuralNetwork* model, float* deltas, int* offsets, int batches, int batch_size);
+
+__global__ void auditWeights(NeuralNetwork* model);
+
 #endif
