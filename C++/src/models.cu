@@ -260,41 +260,45 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         correct = 0;
         logLoss = 0;
         accuracy = 0.0;
-        for(int j = 0; j < total_size; j+=batch_size) {
+        for(int j = 0; j < batch_size; j+=batch_size) {
             //pass inputs through the network
-            auto startForward = std::chrono::system_clock::now();
-            predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);
+            // auto startForward = std::chrono::system_clock::now();
+            //let's work on making the dot product function significantly faster
+            /*
+            We can create a dim3 of size (nWorkers, 2, 1) as the number of blocks passed to our dot product function
+            And a dim3 of size(nThreadsPerWorker, 2, 1) as the number of threads per block
+            */
+            // predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);    
             cudaDeviceSynchronize();
-            // auto endForward = std::chrono::system_clock::now();
-            // std::chrono::duration<double> elapsed_forward = endForward - startForward;
-            // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
-            error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
-            correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-            // printf("Accuracy: %f%%\n", correct / (float) (batch_size)* 100);
-            printf("Log loss %f\n", (logLoss * batch_size)/(float)(j+1));
-            // //compute gradients in forward_pass
-            // auto startBackward = std::chrono::system_clock::now();
-            backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
-            cudaDeviceSynchronize();
-            ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
-            cudaDeviceSynchronize();
-            // auto endReduce = std::chrono::system_clock::now();
-            // std::chrono::duration<double> elapsed_reduce = endReduce - startReduce;
-            // std::cout << "Finished ring reduce in " << elapsed_reduce.count() << " seconds" << std::endl;
-            // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
+            // // auto endForward = std::chrono::system_clock::now();
+            // // std::chrono::duration<double> elapsed_forward = endForward - startForward;
+            // // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
+            // error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+            // correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            // logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+            // // printf("Accuracy: %f%%\n", correct / (float) (batch_size)* 100);
+            // // //compute gradients in forward_pass
+            // // auto startBackward = std::chrono::system_clock::now();
+            // backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
             // cudaDeviceSynchronize();
-            // auditGradients<<<1,1>>>(d_model);
+            // ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
             // cudaDeviceSynchronize();
-            auto startUpdate = std::chrono::system_clock::now();
-            backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
-            cudaDeviceSynchronize();
-            // auditWeights<<<1,1>>>(d_model);
+            // // auto endReduce = std::chrono::system_clock::now();
+            // // std::chrono::duration<double> elapsed_reduce = endReduce - startReduce;
+            // // std::cout << "Finished ring reduce in " << elapsed_reduce.count() << " seconds" << std::endl;
+            // // auditDeltas<<<1,1>>>(d_model, d_deltas, d_offsets, nWorkers*nThreadsPerWorker, batch_size);
+            // // cudaDeviceSynchronize();
+            // // auditGradients<<<1,1>>>(d_model);
+            // // cudaDeviceSynchronize();
+            // auto startUpdate = std::chrono::system_clock::now();
+            // backward_pass<<<nWorkers, nThreadsPerWorker>>>(d_model, batch_size, learning_rate);
             // cudaDeviceSynchronize();
-            // auto endUpdate = std::chrono::system_clock::now();
-            // std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
-            // std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
-            totalEpochs++;
+            // // auditWeights<<<1,1>>>(d_model);
+            // // cudaDeviceSynchronize();
+            // // auto endUpdate = std::chrono::system_clock::now();
+            // // std::chrono::duration<double> elapsed_update = endUpdate - startUpdate;
+            // // std::cout << "Finished weight update in " << elapsed_update.count() << " seconds" << std::endl;
+            // totalEpochs++;
         }
         accuracy = correct / (float) total_size;
         printf("End of epoch %d\n", i+1);

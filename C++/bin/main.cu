@@ -19,8 +19,16 @@ int main(int argc, char** argv) {
     // std::string nThreads_arg = argv[6];
     int numClasses = 10;
     int BATCH_SIZE = std::stoi(argv[2]);
-    int nEpochs = 250;
+    int nEpochs = 1;
     float learning_rate = 0.025;
+
+    /*
+    nWorkers*nThreadsPerWorker is the number of general threads we have working on each batch of memory.
+    It also corresponds with how many copies of the gradients (for both weights and biases) and activations we make for each batch, and should 
+    ideally remain the same for the ring reduce method. 
+    Ring reduce is the ONLY global function that directly relies on this number. 
+    The other global functions rely on it in part, but they can technically be abstracted from one another. 
+    */
     int nWorkers = std::stoi(argv[3]);
     int nThreadsPerWorker = std::stoi(argv[4]);
 

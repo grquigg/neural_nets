@@ -17,7 +17,13 @@ __device__ void matrixAdd(float * matrix1, float * matrix2, int m1_h, int m1_w);
 __device__ void matrixMultiplyByScalar(float* matrix, int m1_h, int m1_w, float scalar);
 
 __device__ void sigmoid(float* inputs, int size);
+
 __device__ void sigmoidD(float* activations, int height, int width, float * delta);
+
+
+__global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
+
+__global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias);
 
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
@@ -50,6 +56,8 @@ __global__ void ringReduce(float * gradients, const int total_steps, const int s
 
 __global__ void ringReduce(LogisticRegression * model, const int total_steps, const int step_size, const int chunk_size);
 
+
+/////NEURAL NETWORKS /////
 __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int* offsets, int size, int nClasses);
 
 __global__ void predict(NeuralNetwork* model, float* inputs, float* activations,  int* offsets, int size);
@@ -57,6 +65,8 @@ __global__ void predict(NeuralNetwork* model, float* inputs, float* activations,
 __global__ void ringReduce(NeuralNetwork* model, const int total_steps);
 
 __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learning_rate);
+
+__global__ void linear_forward(NeuralNetwork* model, float* inputs, float* activations, int * offsets, int size);
 
 ////DEBUGGING FUNCTIONS
 __global__ void auditGradients(NeuralNetwork* model);

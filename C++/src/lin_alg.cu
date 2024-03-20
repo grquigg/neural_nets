@@ -59,7 +59,7 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
                 product[i*weight_w+j] += inputs[i*vector_w+k] * weights[k*weight_w+j];
                 // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
-            // printf("%f\n", product[i*weight_w+j]);
+            printf("%f\n", product[i*weight_w+j]);
         }
     }
 }
@@ -412,4 +412,53 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
         }
     }
     // printf("Finish backward\n");
+}
+
+__global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    int index_x = blockIdx.z*blockDim.y + blockIdx.y;
+    int index_y = threadIdx.z*gridDim.y + threadIdx.y;
+    if(vector_h % (blockDim.y*blockDim.z) != 0 || weight_w % (gridDim.y*gridDim.z)) {
+        printf("BAD ARGUMENTS\n");
+        return;
+    }
+    int size_x = vector_h / (gridDim.y*gridDim.z);
+    int size_y = weight_w / (blockDim.y*blockDim.z);
+    float* out = product+(size_x*index_x*weight_w)+(size_y*index_y); 
+    float* input = inputs+((size_x*index_x*vector_w));
+    float* weight = weights+(size_y*index_y);
+    for(int i = 0; i < size_x; i++) { //for every row in the first matrix
+        for(int j = 0; j < size_y; j++) { //for every column in the second matrix
+            out[i*weight_w+j] = 0.0;
+            for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
+                out[i*weight_w+j] += input[i*vector_w+k] * weight[k*weight_w+j];
+                // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
+            }
+        }
+    }
+}
+
+__global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    int index_x = blockIdx.z*blockDim.y + blockIdx.y;
+    int index_y = threadIdx.z*gridDim.y + threadIdx.y;
+    if(vector_h % (blockDim.y*blockDim.z) != 0 || weight_w % (gridDim.y*gridDim.z)) {
+        printf("BAD ARGUMENTS\n");
+        return;
+    }
+    int size_x = vector_h / (gridDim.y*gridDim.z);
+    int size_y = weight_w / (blockDim.y*blockDim.z);
+    float* out = product+(size_x*index_x*weight_w)+(size_y*index_y); 
+    float* input = inputs+((size_x*index_x*vector_w));
+    float* weight = weights+(size_y*index_y);
+    for(int i = 0; i < size_x; i++) { //for every row in the first matrix
+        for(int j = 0; j < size_y; j++) { //for every column in the second matrix
+            out[i*weight_w+j] = 0.0;
+            for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
+                out[i*weight_w+j] += input[i*vector_w+k] * weight[k*weight_w+j];
+                // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
+            }
+            out[i*weight_w+j] += bias[j];
+        }
+    }
 }
