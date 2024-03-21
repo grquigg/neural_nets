@@ -105,7 +105,7 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the 
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
   int layers[2] = {1, 2};
-  float correct[4] = {0.413f, 0.326f, 0.442f, 0.384f};
+  float correct[4] = {0.413, 0.326, 0.442, 0.384};
   float *weights[1];
   weights[0] = (float*)malloc(2*sizeof(float));
   weights[0][0] = 0.1f;
@@ -122,7 +122,7 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the 
   float *d_product;
   float *d_bias;
   cudaMalloc(&d_bias, 2*sizeof(float));
-  cudaMemcpy(d_bias, model->bias[0], 2*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_bias, model->biases[0], 2*sizeof(float), cudaMemcpyHostToDevice);
   cudaMalloc(&d_weights, 2*sizeof(float));
   cudaMemcpy(d_weights, model->weights[0], 2*sizeof(float), cudaMemcpyHostToDevice);
   cudaMalloc(&d_input, 2*sizeof(float));
@@ -131,4 +131,158 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the 
   dim3 nBlocks(nWorkers, 1, 1);
   dim3 nThreads(nThreadsPerWorker, 1, 1);
   dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+  float *prod = (float*)malloc(4*sizeof(float));
+  cudaMemcpy(prod, d_product, 4*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 4; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
+}
+
+TEST(SegmentedDotProduct, DotProductMultiThreadedEx1) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int layers[2] = {1, 2};
+  float correct[4] = {0.413, 0.326, 0.442, 0.384};
+  float *weights[1];
+  weights[0] = (float*)malloc(2*sizeof(float));
+  weights[0][0] = 0.1f;
+  weights[0][1] = 0.2f;
+  float *biases[1];
+  biases[0] = (float*)malloc(2*sizeof(float));
+  biases[0][0] = 0.4f;
+  biases[0][1] = 0.3f;
+  NeuralNetwork* model = buildModel(1, layers, weights, biases, 1.0, 1, 1);
+  float input[2] = {0.13f, 0.42f};
+  float product[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  float *d_weights;
+  float *d_input;
+  float *d_product;
+  float *d_bias;
+  cudaMalloc(&d_bias, 2*sizeof(float));
+  cudaMemcpy(d_bias, model->biases[0], 2*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights, 2*sizeof(float));
+  cudaMemcpy(d_weights, model->weights[0], 2*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_input, 2*sizeof(float));
+  cudaMemcpy(d_input, input, 2*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_product, 4*sizeof(float));
+  dim3 nBlocks(nWorkers, 2, 1);
+  dim3 nThreads(nThreadsPerWorker, 2, 1);
+  dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+  float *prod = (float*)malloc(4*sizeof(float));
+  cudaMemcpy(prod, d_product, 4*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 4; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
+}
+
+TEST(SegmentedDotProduct, DotProductSingleThreadedEx2) { //REMEMBER THAT WE'RE TAKING THE TRANSPOSE OF THE MATRIX IN THE EXAMPLE
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int layers[2] = {2, 4};
+  float correct[8] = {0.74f, 1.1192f, 0.3564f, 0.8744f, 0.55250f, 0.81380f, 0.17610f, 0.60410f};
+  // float correct[4] = {0.74f, 1.1192f, 0.3564f, 0.8744f};
+  float *weights[1];
+  float weight[8] = {0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[0] = weight;
+  float *biases[1];
+  float bias[4] = {0.42f, 0.72f, 0.01f, 0.3f};
+  biases[0] = bias;
+  NeuralNetwork* model = buildModel(1, layers, weights, biases, 1.0, 1, 1);
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float *d_weights;
+  float *d_input;
+  float *d_product;
+  float *d_bias;
+  cudaMalloc(&d_bias, model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_bias, model->biases[0], model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights, model->layer_size[0]*model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_weights, model->weights[0], model->layer_size[0]*model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_input, 4*sizeof(float));
+  cudaMemcpy(d_input, input, 4*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_product, 8*sizeof(float));
+  dim3 nBlocks(nWorkers, 1, 1);
+  dim3 nThreads(nThreadsPerWorker, 1, 1);
+  dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+  float *prod = (float*)malloc(8*sizeof(float));
+  cudaMemcpy(prod, d_product, 8*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 8; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
+}
+
+TEST(SegmentedDotProduct, DotProductMultiThreadedEx2) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int layers[2] = {2, 4};
+  float correct[8] = {0.74f, 1.1192f, 0.3564f, 0.8744f, 0.55250f, 0.81380f, 0.17610f, 0.60410f};
+  // float correct[4] = {0.74f, 1.1192f, 0.3564f, 0.8744f};
+  float *weights[1];
+  float weight[8] = {0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[0] = weight;
+  float *biases[1];
+  float bias[4] = {0.42f, 0.72f, 0.01f, 0.3f};
+  biases[0] = bias;
+  NeuralNetwork* model = buildModel(1, layers, weights, biases, 1.0, 1, 1);
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float *d_weights;
+  float *d_input;
+  float *d_product;
+  float *d_bias;
+  cudaMalloc(&d_bias, model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_bias, model->biases[0], model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights, model->layer_size[0]*model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_weights, model->weights[0], model->layer_size[0]*model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_input, 4*sizeof(float));
+  cudaMemcpy(d_input, input, 4*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_product, 8*sizeof(float));
+  dim3 nBlocks(nWorkers, 2, 1);
+  dim3 nThreads(nThreadsPerWorker, 1, 1);
+  dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+  float *prod = (float*)malloc(8*sizeof(float));
+  cudaMemcpy(prod, d_product, 8*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 8; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
+
+  nBlocks.y = 1;
+  nThreads.y = 2;
+  for(int i = 0; i < 8; i++) {
+    prod[i] = 0;
+  }
+  cudaMemcpy(d_product, prod, 8*sizeof(float), cudaMemcpyHostToDevice);
+  dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+
+  cudaMemcpy(prod, d_product, 8*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 8; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
+
+  nBlocks.y = 2;
+  for(int i = 0; i < 8; i++) {
+    prod[i] = 0;
+  }
+  cudaMemcpy(d_product, prod, 8*sizeof(float), cudaMemcpyHostToDevice);
+  dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+  cudaMemcpy(prod, d_product, 8*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 8; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
+
+  nThreads.z = 2;
+  for(int i = 0; i < 8; i++) {
+    prod[i] = 0;
+  }
+  cudaMemcpy(d_product, prod, 8*sizeof(float), cudaMemcpyHostToDevice);
+  dotProductSegmented<<<nBlocks, nThreads>>>(d_input, d_weights, d_product, 2, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias);
+  cudaDeviceSynchronize();
+  cudaMemcpy(prod, d_product, 8*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 8; i++) {
+    EXPECT_FLOAT_EQ(prod[i], correct[i]);
+  }
 }

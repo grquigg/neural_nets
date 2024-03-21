@@ -418,12 +418,13 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int index_x = blockIdx.z*blockDim.y + blockIdx.y;
     int index_y = threadIdx.z*gridDim.y + threadIdx.y;
-    if(vector_h % (blockDim.y*blockDim.z) != 0 || weight_w % (gridDim.y*gridDim.z)) {
+    if(vector_h % (gridDim.y*gridDim.z) != 0 || weight_w % (blockDim.y*blockDim.z)) {
         printf("BAD ARGUMENTS\n");
         return;
     }
     int size_x = vector_h / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
+    printf("Size_x: %d\nSize_y: %d\n", size_x, size_y);
     float* out = product+(size_x*index_x*weight_w)+(size_y*index_y); 
     float* input = inputs+((size_x*index_x*vector_w));
     float* weight = weights+(size_y*index_y);
@@ -442,9 +443,15 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int index_x = blockIdx.z*blockDim.y + blockIdx.y;
     int index_y = threadIdx.z*gridDim.y + threadIdx.y;
-    if(vector_h % (blockDim.y*blockDim.z) != 0 || weight_w % (gridDim.y*gridDim.z)) {
+    if((vector_h % (gridDim.y*gridDim.z) != 0) || (weight_w % (blockDim.y*blockDim.z) != 0)) {
         printf("BAD ARGUMENTS\n");
+        printf("Size_x %d %d\nSize_y %d %d\n", vector_h, gridDim.y*gridDim.z, weight_w, blockDim.y*blockDim.z);
         return;
+    }
+    if((vector_h < gridDim.y*gridDim.z) || (weight_w < blockDim.y*blockDim.z)) {
+        printf("BAD ARGUMENTS\n");
+        printf("Size_x %d %d\nSize_y %d %d\n", vector_h, gridDim.y*gridDim.z, weight_w, blockDim.y*blockDim.z);
+        return; 
     }
     int size_x = vector_h / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
@@ -458,7 +465,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
                 out[i*weight_w+j] += input[i*vector_w+k] * weight[k*weight_w+j];
                 // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
-            out[i*weight_w+j] += bias[j];
+            out[i*weight_w+j] += bias[j+(index_y*size_y)];
         }
     }
 }
