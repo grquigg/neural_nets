@@ -325,3 +325,25 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     
     
 }
+
+NeuralNetwork* buildModel(int nLayers, int * layer_size, float** weights, float **biases, float lambda, int nThreadsPerWorker, int nWorkers) {
+    NeuralNetwork* model = new NeuralNetwork;
+    model->nLayers = nLayers;
+    model->lambda = lambda;
+    model->layer_size = (int*)malloc((model->nLayers+1)*sizeof(int));
+    model->layer_size = layer_size;
+    model->weights = (float**)malloc((model->nLayers)*sizeof(float*));
+    model->biases = (float**)malloc((model->nLayers)*sizeof(float*));
+    model->gradients = (float**)malloc((model->nLayers)*sizeof(float*));
+    model->grad_biases =(float**)malloc((model->nLayers)*sizeof(float*));
+    model->nClasses = model->layer_size[model->nLayers];
+    for(int i = 1; i < model->nLayers+1; i++) {
+        model->weights[i-1] = initializeFlatRandomArray(model->layer_size[i-1], model->layer_size[i]);
+        model->biases[i-1] = initializeFlatRandomArray(1, model->layer_size[i]);
+        model->grad_biases[i-1] = (float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i]);
+        model->gradients[i-1] =(float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]);
+    }
+    model->weights = weights;
+    model->biases = biases;
+    return model;
+}

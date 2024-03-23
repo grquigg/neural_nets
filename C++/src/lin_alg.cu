@@ -440,6 +440,8 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
 }
 
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias) {
+    printf("Successful call\n");
+    printf("Input start %f %f\n", inputs[0], product[0]);
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int index_x = blockIdx.z*blockDim.y + blockIdx.y;
     int index_y = threadIdx.z*gridDim.y + threadIdx.y;
@@ -466,6 +468,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
                 // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
             out[i*weight_w+j] += bias[j+(index_y*size_y)];
+            // printf("Here %d %f\n", i*weight_w+j, out[i*weight_w+j]);
         }
     }
 }
@@ -480,3 +483,14 @@ __global__ void sigmoidSegmented(float* inputs, int inputSize) {
     sigmoid(inputs+(blockSize*index), blockSize);
 
 }
+
+__global__ void softmaxSegmented(float* product, int product_height, int product_width) {
+    if(product_height % (blockDim.x * gridDim.x) != 0) {
+        printf("BAD ARGUMENT\n");
+        return;
+    }
+    int blockSize = product_height / (blockDim.x * gridDim.x);
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    softmax(product+(blockSize*index), blockSize, product_width);
+}
+

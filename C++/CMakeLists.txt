@@ -77,13 +77,24 @@ endforeach(EXEC)
 set_property(TARGET Neural_Net PROPERTY CUDA_ARCHITECTURES 50 72)
 
 add_executable(
-  hello_test
-  tests/test.cu
+  mono_threaded
+  tests/mono_thread.cu
 )
 target_link_libraries(
-  hello_test
+  mono_threaded
   GTest::gtest_main ${LIBNAME}
 )
-set_property(TARGET hello_test PROPERTY CUDA_ARCHITECTURES 50 72)
+add_executable(
+  multi_threaded
+  tests/multi_thread.cu
+)
+
+target_link_libraries(
+  multi_threaded
+  GTest::gtest_main ${LIBNAME}
+)
+set_property(TARGET mono_threaded PROPERTY CUDA_ARCHITECTURES 50 72)
+set_property(TARGET multi_threaded PROPERTY CUDA_ARCHITECTURES 50 72)
 include(GoogleTest)
-gtest_discover_tests(hello_test)
+gtest_discover_tests(mono_threaded)
+gtest_discover_tests(multi_threaded)
