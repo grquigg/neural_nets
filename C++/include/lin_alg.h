@@ -21,6 +21,8 @@ __device__ void sigmoid(float* inputs, int size);
 __device__ void sigmoidD(float* activations, int height, int width, float * delta);
 
 
+__global__ void sigmoidSegmented(float * inputs, int inputSize);
+
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias);

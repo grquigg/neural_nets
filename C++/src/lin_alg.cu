@@ -469,3 +469,14 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
         }
     }
 }
+
+__global__ void sigmoidSegmented(float* inputs, int inputSize) {
+    if(inputSize % (blockDim.x * gridDim.x) != 0) {
+        printf("BAD ARGUMENT\n");
+        return;
+    }
+    int blockSize = inputSize / (blockDim.x * gridDim.x);
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    sigmoid(inputs+(blockSize*index), blockSize);
+
+}
