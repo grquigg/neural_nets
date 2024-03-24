@@ -510,3 +510,195 @@ TEST(ForwardPass, SingleThreadedSoftmaxEx1_2) {
      EXPECT_FLOAT_EQ(correctOutput[i], activations[i]);
   }
 }
+
+TEST(ForwardPass, SingleThreadedForwardPassEx2_BATCH_SIZE_1) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 1;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float * weights[3];
+  float weight0[8] = {0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  float weight1[12] = {0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  float weight2[6] = {0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  weights[0] = weight0;
+  weights[1] = weight1;
+  weights[2] = weight2;
+  float * biases[3];
+  float bias0[4] = {0.42f, 0.72f, 0.01f, 0.3f};
+  float bias1[3] = {0.21f, 0.87f, 0.03f};
+  float bias2[2] = {0.04f, 0.17f};
+  biases[0] = bias0;
+  biases[1] = bias1;
+  biases[2] = bias2;
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float expected[18] = {
+    0.67699581f, 0.75384f, 0.58816868f, 0.7056604f,
+    0.87519467f, 0.8929618f, 0.81480443f,
+    0.48506981f, 0.51493f,
+    0.63471538f, 0.69291866f, 0.54391158f, 0.64659375f,
+    0.86020094f, 0.8833645f, 0.79790765f,
+    0.4841319f, 0.51586807f
+  };
+  NeuralNetwork* model = buildModel(nLayers, layers, weights, biases, 1.0, nWorkers, nThreadsPerWorker);
+  float *d_weights0;
+  float *d_weights1;
+  float *d_weights2;
+  float *d_input;
+  float *d_bias0;
+  float *d_bias1;
+  float *d_bias2;
+  cudaMalloc(&d_bias0, model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_bias0, model->biases[0], model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_bias1, model->layer_size[2]*sizeof(float));
+  cudaMemcpy(d_bias1, model->biases[1], model->layer_size[2]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_bias2, model->layer_size[3]*sizeof(float));
+  cudaMemcpy(d_bias2, model->biases[2], model->layer_size[3]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights0, model->layer_size[0]*model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_weights0, model->weights[0], model->layer_size[0]*model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights1, model->layer_size[1]*model->layer_size[2]*sizeof(float));
+  cudaMemcpy(d_weights1, model->weights[1], model->layer_size[1]*model->layer_size[2]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights2, model->layer_size[2]*model->layer_size[3]*sizeof(float));
+  cudaMemcpy(d_weights2, model->weights[2], model->layer_size[2]*model->layer_size[3]*sizeof(float), cudaMemcpyHostToDevice); 
+  cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
+  cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
+  int activations_size = 0;
+  int * offsets = new int[model->nLayers];
+  for(int i = 1; i <= model->nLayers; i++) {
+    offsets[i-1] = (batch_size * activations_size);
+    // printf("Offset at %d: %d\n", i-1, offsets[i-1]);
+    activations_size += model->layer_size[i];
+    
+  }
+  EXPECT_EQ(offsets[0], 0);
+  EXPECT_EQ(offsets[1], model->layer_size[1]);
+  EXPECT_EQ(offsets[2], offsets[1]+model->layer_size[2]);
+  float * d_activations = new float[batch_size*activations_size];
+  float * activations = new float[batch_size*activations_size];
+  //device pointers
+  int * d_offsets;
+  cudaMalloc(&d_activations, activations_size*batch_size*sizeof(float));
+  cudaMalloc(&d_offsets, model->nLayers*sizeof(int));
+  for(int i = 0; i < activations_size*batch_size; i++) {
+    activations[i] = 1;
+  }
+  cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_offsets, offsets, model->nLayers*sizeof(int), cudaMemcpyHostToDevice);
+  dim3 nBlocks(nWorkers, 1, 1);
+  dim3 nThreads(nThreadsPerWorker, 1, 1);
+  for(int i = 0; i < 2; i+=batch_size) {
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_input+(i*model->layer_size[0]), d_weights0, d_activations, batch_size, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias0);
+    cudaDeviceSynchronize();
+    sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations, batch_size*model->layer_size[1]);
+    cudaDeviceSynchronize();
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations, d_weights1, d_activations+(offsets[1]), batch_size, model->layer_size[1], model->layer_size[1], model->layer_size[2], d_bias1);
+    cudaDeviceSynchronize();
+    sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations+offsets[1], batch_size*model->layer_size[2]);
+    cudaDeviceSynchronize();
+    dotProductSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations+offsets[1], d_weights2, d_activations+offsets[2], batch_size, model->layer_size[2], model->layer_size[2], model->layer_size[3], d_bias2);
+    cudaDeviceSynchronize();
+    softmaxSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations+(offsets[2]), batch_size, model->layer_size[3]);
+    cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+    printf("BATCH %d\n", i);
+    for(int j = 0; j < activations_size*batch_size; j++) {
+      printf("j: %d\n", i*activations_size+j);
+      EXPECT_FLOAT_EQ(expected[i*activations_size+j], activations[j]);
+    }
+  }
+}
+
+TEST(ForwardPass, SingleThreadedForwardPassEx2_BATCH_SIZE_2) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float * weights[3];
+  float weight0[8] = {0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  float weight1[12] = {0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  float weight2[6] = {0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  weights[0] = weight0;
+  weights[1] = weight1;
+  weights[2] = weight2;
+  float * biases[3];
+  float bias0[4] = {0.42f, 0.72f, 0.01f, 0.3f};
+  float bias1[3] = {0.21f, 0.87f, 0.03f};
+  float bias2[2] = {0.04f, 0.17f};
+  biases[0] = bias0;
+  biases[1] = bias1;
+  biases[2] = bias2;
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float expected[18] = {
+    0.67699581f, 0.75384f, 0.58816868f, 0.7056604f,
+    0.63471538f, 0.69291866f, 0.54391158f, 0.64659375f,
+    0.87519467f, 0.8929618f, 0.81480443f,
+    0.86020094f, 0.8833645f, 0.79790765f,
+    0.48506981f, 0.51493f,
+    0.4841319f, 0.51586807f
+  };
+  NeuralNetwork* model = buildModel(nLayers, layers, weights, biases, 1.0, nWorkers, nThreadsPerWorker);
+  float *d_weights0;
+  float *d_weights1;
+  float *d_weights2;
+  float *d_input;
+  float *d_bias0;
+  float *d_bias1;
+  float *d_bias2;
+  cudaMalloc(&d_bias0, model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_bias0, model->biases[0], model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_bias1, model->layer_size[2]*sizeof(float));
+  cudaMemcpy(d_bias1, model->biases[1], model->layer_size[2]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_bias2, model->layer_size[3]*sizeof(float));
+  cudaMemcpy(d_bias2, model->biases[2], model->layer_size[3]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights0, model->layer_size[0]*model->layer_size[1]*sizeof(float));
+  cudaMemcpy(d_weights0, model->weights[0], model->layer_size[0]*model->layer_size[1]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights1, model->layer_size[1]*model->layer_size[2]*sizeof(float));
+  cudaMemcpy(d_weights1, model->weights[1], model->layer_size[1]*model->layer_size[2]*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMalloc(&d_weights2, model->layer_size[2]*model->layer_size[3]*sizeof(float));
+  cudaMemcpy(d_weights2, model->weights[2], model->layer_size[2]*model->layer_size[3]*sizeof(float), cudaMemcpyHostToDevice); 
+  cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
+  cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
+  int activations_size = 0;
+  int * offsets = new int[model->nLayers];
+  for(int i = 1; i <= model->nLayers; i++) {
+    offsets[i-1] = (batch_size * activations_size);
+    // printf("Offset at %d: %d\n", i-1, offsets[i-1]);
+    activations_size += model->layer_size[i];
+    
+  }
+  EXPECT_EQ(offsets[0], 0);
+  EXPECT_EQ(offsets[1], batch_size*model->layer_size[1]);
+  EXPECT_EQ(offsets[2], offsets[1]+(batch_size*model->layer_size[2]));
+  float * d_activations = new float[batch_size*activations_size];
+  float * activations = new float[batch_size*activations_size];
+  //device pointers
+  int * d_offsets;
+  cudaMalloc(&d_activations, activations_size*batch_size*sizeof(float));
+  cudaMalloc(&d_offsets, model->nLayers*sizeof(int));
+  for(int i = 0; i < activations_size*batch_size; i++) {
+    activations[i] = 1;
+  }
+  cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_offsets, offsets, model->nLayers*sizeof(int), cudaMemcpyHostToDevice);
+  dim3 nBlocks(nWorkers, 1, 1);
+  dim3 nThreads(nThreadsPerWorker, 1, 1);
+  for(int i = 0; i < 2; i+=batch_size) {
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_input+(i*model->layer_size[0]), d_weights0, d_activations, batch_size, model->layer_size[0], model->layer_size[0], model->layer_size[1], d_bias0);
+    cudaDeviceSynchronize();
+    sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations, batch_size*model->layer_size[1]);
+    cudaDeviceSynchronize();
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations, d_weights1, d_activations+(offsets[1]), batch_size, model->layer_size[1], model->layer_size[1], model->layer_size[2], d_bias1);
+    cudaDeviceSynchronize();
+    sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations+offsets[1], batch_size*model->layer_size[2]);
+    cudaDeviceSynchronize();
+    dotProductSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations+offsets[1], d_weights2, d_activations+offsets[2], batch_size, model->layer_size[2], model->layer_size[2], model->layer_size[3], d_bias2);
+    cudaDeviceSynchronize();
+    softmaxSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations+(offsets[2]), batch_size, model->layer_size[3]);
+    cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+    printf("BATCH %d\n", i);
+    for(int j = 0; j < activations_size*batch_size; j++) {
+      printf("j: %d\n", i*activations_size+j);
+      EXPECT_FLOAT_EQ(expected[i*activations_size+j], activations[j]);
+    }
+  }
+}
