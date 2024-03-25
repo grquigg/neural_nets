@@ -446,6 +446,7 @@ TEST(ForwardPass, SingleThreadedSoftmaxEx1_BATCH_SIZE_2) {
     }
   }
 }
+
 TEST(ForwardPass, SingleThreadedSoftmaxEx1_2) {
   int nWorkers = 1;
   int nThreadsPerWorker = 1;

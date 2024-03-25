@@ -457,7 +457,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     }
     int size_x = vector_h / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
-    float* out = product+(size_x*index_x*weight_w)+(size_y*index_y); 
+    float* out = product+(index*batch_size)*(size_x*index_x*weight_w)+(size_y*index_y); 
     float* input = inputs+((size_x*index_x*vector_w));
     float* weight = weights+(size_y*index_y);
     for(int i = 0; i < size_x; i++) { //for every row in the first matrix
