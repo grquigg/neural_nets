@@ -443,22 +443,31 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     printf("Successful call\n");
     printf("Input start %f %f\n", inputs[0], product[0]);
     int index = blockIdx.x*blockDim.x + threadIdx.x;
+    //we subdivide vector_h in "mini-batches" of size batch_size
+    //we need to check that (blockDim.x * gridDim.x) is divisible by vector_h
+    if(vector_h % (blockDim.x * gridDim.x) != 0) {
+        printf("BAD ARGUMENT for global batch size\n");
+        return;
+    }
+    int batch_size = vector_h / (blockDim.x * gridDim.x);
     int index_x = blockIdx.z*blockDim.y + blockIdx.y;
     int index_y = threadIdx.z*gridDim.y + threadIdx.y;
-    if((vector_h % (gridDim.y*gridDim.z) != 0) || (weight_w % (blockDim.y*blockDim.z) != 0)) {
+    //and we subdivide batch_size further by dividing by gridDim.y*gridDim.z
+    if((batch_size % (gridDim.y*gridDim.z) != 0) || (weight_w % (blockDim.y*blockDim.z) != 0)) {
         printf("BAD ARGUMENTS\n");
         printf("Size_x %d %d\nSize_y %d %d\n", vector_h, gridDim.y*gridDim.z, weight_w, blockDim.y*blockDim.z);
         return;
     }
-    if((vector_h < gridDim.y*gridDim.z) || (weight_w < blockDim.y*blockDim.z)) {
+    if((batch_size < gridDim.y*gridDim.z) || (weight_w < blockDim.y*blockDim.z)) {
         printf("BAD ARGUMENTS\n");
-        printf("Size_x %d %d\nSize_y %d %d\n", vector_h, gridDim.y*gridDim.z, weight_w, blockDim.y*blockDim.z);
+        printf("Size_x %d %d\nSize_y %d %d\n", batch_size, gridDim.y*gridDim.z, weight_w, blockDim.y*blockDim.z);
         return; 
     }
-    int size_x = vector_h / (gridDim.y*gridDim.z);
+    int size_x = batch_size / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
-    float* out = product+(index*batch_size)*(size_x*index_x*weight_w)+(size_y*index_y); 
-    float* input = inputs+((size_x*index_x*vector_w));
+    printf("Start for %d %d %d\n", index, index*batch_size*vector_w, index*batch_size*weight_w);
+    float* out = product+(index*batch_size*weight_w)+(size_x*index_x*weight_w)+(size_y*index_y); 
+    float* input = inputs+(index*batch_size*vector_w)+((size_x*index_x*vector_w));
     float* weight = weights+(size_y*index_y);
     for(int i = 0; i < size_x; i++) { //for every row in the first matrix
         for(int j = 0; j < size_y; j++) { //for every column in the second matrix

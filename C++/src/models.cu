@@ -5,6 +5,22 @@
 #include <iostream>
 #include <cublas_v2.h>
 
+
+NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
+    this->nLayers = nLayers;
+    this->layer_size = layer_size;
+}
+
+NeuralNetwork::~NeuralNetwork() {
+
+}
+
+NeuralNetwork::NeuralNetwork() {}
+
+NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** gradients, float lambda) {
+
+}
+
 float* transferMatrixToDevice(float *matrix, int height, int width) {
     float* deviceMatrix;
     cudaMalloc(&deviceMatrix, height*width*sizeof(float));
@@ -14,11 +30,6 @@ float* transferMatrixToDevice(float *matrix, int height, int width) {
     return deviceMatrix;
 }
 
-// LogisticRegression * copyModelToHost(LogisticRegression *model, LogisticRegression *start) {
-//     LogisticRegression* host;
-//     host->weights = initializeFlatRandomArray(nFeatures, numClasses);
-//     host->gradients = (float*)malloc(nFeatures*numClasses*sizeof(float));
-// }
 LogisticRegression* copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker) {
     //define pointer for GPU's copy of the model
     LogisticRegression* d_model;
@@ -47,7 +58,6 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     NeuralNetwork* d_model;
     int * nLayers;
     float **d_weights;
-    float **d_weights_t;
     float **d_biases;
     float **d_gradients;
     float **d_grad_biases;
@@ -70,6 +80,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
     }
+    printf("Success\n");
     cudaMalloc(&d_gradients, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_gradients, temp_gradients, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_grad_biases, (model->nLayers)*sizeof(float*));
@@ -180,7 +191,7 @@ void train(LogisticRegression *model, float* train_input, std::vector<std::vecto
 }
 
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
-int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker) {
+int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker, bool useMultiThreaded) {
     NeuralNetwork *d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
     //copy train data
     float *d_inputs;
@@ -268,7 +279,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             We can create a dim3 of size (nWorkers, 2, 1) as the number of blocks passed to our dot product function
             And a dim3 of size(nThreadsPerWorker, 2, 1) as the number of threads per block
             */
-            // predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);    
+            predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);    
             cudaDeviceSynchronize();
             // // auto endForward = std::chrono::system_clock::now();
             // // std::chrono::duration<double> elapsed_forward = endForward - startForward;
@@ -327,7 +338,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 }
 
 NeuralNetwork* buildModel(int nLayers, int * layer_size, float** weights, float **biases, float lambda, int nThreadsPerWorker, int nWorkers) {
-    NeuralNetwork* model = new NeuralNetwork;
+    NeuralNetwork* model = new NeuralNetwork(nLayers, layer_size);
     model->nLayers = nLayers;
     model->lambda = lambda;
     model->layer_size = (int*)malloc((model->nLayers+1)*sizeof(int));

@@ -84,6 +84,7 @@ target_link_libraries(
   mono_threaded
   GTest::gtest_main ${LIBNAME}
 )
+
 add_executable(
   multi_threaded
   tests/multi_thread.cu
@@ -93,8 +94,20 @@ target_link_libraries(
   multi_threaded
   GTest::gtest_main ${LIBNAME}
 )
+
+add_executable(
+  main_tests
+  tests/test.cu
+)
+
+target_link_libraries(
+  main_tests
+  GTest::gtest_main ${LIBNAME}
+)
 set_property(TARGET mono_threaded PROPERTY CUDA_ARCHITECTURES 50 72)
 set_property(TARGET multi_threaded PROPERTY CUDA_ARCHITECTURES 50 72)
+set_property(TARGET main_tests PROPERTY CUDA_ARCHITECTURES 50 72)
 include(GoogleTest)
 gtest_discover_tests(mono_threaded)
 gtest_discover_tests(multi_threaded)
+gtest_discover_tests(main_tests)

@@ -9,15 +9,20 @@ struct LogisticRegression {
     float * gradients;
 };
 
-struct NeuralNetwork {
-    int nClasses;
-    int nLayers;
-    int * layer_size;
-    float ** weights;
-    float ** biases;
-    float lambda;
-    float ** gradients;
-    float ** grad_biases;
+class NeuralNetwork {
+    public:
+        int nClasses;
+        int nLayers;
+        int * layer_size;
+        float ** weights;
+        float ** biases;
+        float lambda;
+        float ** gradients;
+        float ** grad_biases;
+        NeuralNetwork();
+        NeuralNetwork(int nLayers, int * layer_size);
+        NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** gradients, float lambda);
+        ~NeuralNetwork();
 };
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
@@ -43,7 +48,7 @@ void train(LogisticRegression *model, float* train_input, std::vector<std::vecto
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker);
 
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
-int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker);
+int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker, bool useMultiThreaded);
 
 NeuralNetwork* buildModel(int nLayers, int * layer_size, float** weights, float **biases, float lambda, int nThreadsPerWorker, int nWorkers);
 
