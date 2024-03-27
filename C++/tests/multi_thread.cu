@@ -287,6 +287,7 @@ TEST(ForwardPass, MultiThreadedDotProduct2Ex1_BATCH_SIZE_1) {
     printf("NEXT\n");
     cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
     for(int j = 0; j < activations_size; j++) {
+        printf("j: %d\n", j);
         EXPECT_FLOAT_EQ(correctOutput[i*activations_size+j], activations[j]);
     }
   }

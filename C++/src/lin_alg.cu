@@ -342,6 +342,11 @@ __global__ void auditWeights(NeuralNetwork* model) {
     }
 }
 
+__global__ void test_func(float* mat, float* weights, float* prod, int vector_h, int vector_w) {
+    printf("Successful significant\n");
+    printf("%f %f\n", mat[0], mat[1]);
+}
+
 __global__ void ringReduce(NeuralNetwork* model, const int total_steps) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     for(int i = 0; i < model->nLayers; i++) {
@@ -415,6 +420,7 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
 }
 
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
+    printf("This is called\n");
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int index_x = blockIdx.z*blockDim.y + blockIdx.y;
     int index_y = threadIdx.z*gridDim.y + threadIdx.y;
@@ -477,7 +483,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
                 // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
             out[i*weight_w+j] += bias[j+(index_y*size_y)];
-            // printf("Here %d %f\n", i*weight_w+j, out[i*weight_w+j]);
+            printf("Here %d %f\n", i*weight_w+j, out[i*weight_w+j]);
         }
     }
 }

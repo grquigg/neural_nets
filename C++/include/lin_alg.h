@@ -6,6 +6,8 @@
 
 //////////DEVICES/GENERAL LINEAR ALGEBRA FUNCTIONS////////
 
+__global__ void test_func(float* mat, float* weights, float* prod, int vector_h, int vector_w);
+
 __device__ void reLU(float* mat, int height, int width);
 
 __device__ void softmax(float* product, int product_height, int product_width);

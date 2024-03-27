@@ -17,8 +17,12 @@ NeuralNetwork::~NeuralNetwork() {
 
 NeuralNetwork::NeuralNetwork() {}
 
-NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** gradients, float lambda) {
-
+NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda) {
+    this->nLayers = nLayers;
+    this->layer_size = layer_size;
+    this->weights = weights;
+    this->biases = biases;
+    this->lambda = lambda;
 }
 
 float* transferMatrixToDevice(float *matrix, int height, int width) {
@@ -55,17 +59,16 @@ LogisticRegression* copyModelToGPU(LogisticRegression *model, int nWorkers, int 
 }
 
 NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
-    NeuralNetwork* d_model;
     int * nLayers;
     float **d_weights;
     float **d_biases;
     float **d_gradients;
     float **d_grad_biases;
     //allocate all of the memory that we need to CUDA
-    cudaMalloc(&d_model, sizeof(NeuralNetwork));
+    // cudaMalloc(&d_model, sizeof(NeuralNetwork));
     cudaMalloc(&nLayers, (model->nLayers+1)*sizeof(int));
     cudaMemcpy(nLayers, model->layer_size, (model->nLayers+1)*sizeof(int), cudaMemcpyHostToDevice);
-    // // cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
+    // cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     // cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
     float **temp_weights = new float*[model->nLayers];
     float **temp_biases = new float*[model->nLayers];
@@ -80,7 +83,6 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
         cudaMalloc(&temp_grad_biases[i-1],  nThreadsPerWorker*nWorkers*model->layer_size[i]*sizeof(float));
     }
-    printf("Success\n");
     cudaMalloc(&d_gradients, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_gradients, temp_gradients, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_grad_biases, (model->nLayers)*sizeof(float*));
@@ -89,17 +91,17 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_weights, temp_weights, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
-    NeuralNetwork temp = *model;
-    temp.nClasses = model->nClasses;
-    temp.nLayers = model->nLayers;
-    temp.layer_size = nLayers;
-    temp.weights = d_weights;
-    temp.gradients = d_gradients;
-    temp.biases = d_biases;
-    temp.grad_biases = d_grad_biases;
-    temp.lambda = model->lambda;
-    cudaMemcpy(d_model, &temp, sizeof(NeuralNetwork), cudaMemcpyHostToDevice);
-    return d_model;
+    NeuralNetwork *temp = new NeuralNetwork();
+    temp->nClasses = model->nClasses;
+    temp->nLayers = model->nLayers;
+    temp->layer_size = nLayers;
+    temp->weights = temp_weights;
+    temp->gradients = d_gradients;
+    temp->biases = temp_biases;
+    temp->grad_biases = d_grad_biases;
+    temp->lambda = model->lambda;
+    printf("Success\n");
+    return temp;
 }
 
 void train(LogisticRegression *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
