@@ -23,6 +23,12 @@ class NeuralNetwork {
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** gradients, float lambda);
         ~NeuralNetwork();
+
+        void train();
+
+        void NeuralNetwork::forward_pass(float* inputs, int batch_size, int nWorker, int nThreadsPerWorker);
+
+        void backprop();
 };
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
