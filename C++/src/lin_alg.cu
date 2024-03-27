@@ -483,7 +483,6 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
                 // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
             out[i*weight_w+j] += bias[j+(index_y*size_y)];
-            printf("Here %d %f\n", i*weight_w+j, out[i*weight_w+j]);
         }
     }
 }

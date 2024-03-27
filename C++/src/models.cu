@@ -21,7 +21,13 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
 }
 
 NeuralNetwork::~NeuralNetwork() {
-
+    for(int i = 0; i < nLayers; i++) {
+        free(this->weights[i]);
+        free(this->biases[i]);
+    }
+    free(this->weights);
+    free(this->biases);
+    free(this->layer_size);
 }
 
 NeuralNetwork::NeuralNetwork() {}
@@ -33,7 +39,6 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
     this->biases = biases;
     this->lambda = lambda;
 }
-
 
 void NeuralNetwork::forward_pass(float* train_input, int batch_size, int nWorkers, int nThreadsPerWorkers) {
     

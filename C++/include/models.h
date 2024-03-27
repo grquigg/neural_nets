@@ -21,7 +21,7 @@ class NeuralNetwork {
         float ** grad_biases;
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
-        NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** gradients, float lambda);
+        NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);
         ~NeuralNetwork();
 
         void train();
