@@ -1,8 +1,21 @@
 #ifndef MODELS_H
 #define MODELS_H
 #include <memory>
-float* transferMatrixToDevice(float *matrix, int height, int width);
+std::shared_ptr<float> transferMatrixToDevice(float *matrix, int height, int width);
+
+std::shared_ptr<int> transferMatrixToDevice(int * matrix, int height, int width);
+
 void free2DArrayFromDevice(float ** array, int * array_size);
+
+struct CudaDeallocator {
+    void operator()(float* ptr) {
+        cudaFree(ptr);
+    }
+
+    void operator()(int* ptr) {
+        cudaFree(ptr);
+    }
+};
 
 struct LogisticRegression {
     int nFeatures;
@@ -31,7 +44,7 @@ class NeuralNetwork {
 
         void train();
 
-        void NeuralNetwork::forward_pass(float* inputs, int batch_size, int nWorker, int nThreadsPerWorker);
+        void forward_pass(float* inputs, int batch_size, int nWorker, int nThreadsPerWorker);
 
         void backprop();
 };

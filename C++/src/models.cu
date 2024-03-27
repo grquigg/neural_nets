@@ -10,15 +10,25 @@ void free2DArrayFromDevice(float ** array, int * array_size) {
 
 }
 
-float* transferMatrixToDevice(float *matrix, int height, int width) {
-    float* deviceMatrix;
+std::shared_ptr<float> transferMatrixToDevice(float *matrix, int height, int width) {
+    float* deviceMatrix = nullptr;
     cudaMalloc(&deviceMatrix, height*width*sizeof(float));
     for(int i = 0; i < height; i++) {
         cudaMemcpy(deviceMatrix+(i*width), matrix+(i*width), sizeof(float)*width, cudaMemcpyHostToDevice);
     }
-    return deviceMatrix;
+    std::shared_ptr<float> return_mat = std::shared_ptr<float>(deviceMatrix, CudaDeallocator());
+    return return_mat;
 }
 
+std::shared_ptr<int> transferMatrixToDevice(int * matrix, int height, int width) {
+    int* deviceMatrix = nullptr;
+    cudaMalloc(&deviceMatrix, height*width*sizeof(int));
+    for(int i = 0; i < height; i++) {
+        cudaMemcpy(deviceMatrix+(i*width), matrix+(i*width), sizeof(int)*width, cudaMemcpyHostToDevice);
+    }
+    std::shared_ptr<int> return_mat = std::shared_ptr<int>(deviceMatrix, CudaDeallocator());
+    return return_mat;
+}
 
 NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
     this->nLayers = nLayers;
@@ -49,30 +59,6 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
 
 void NeuralNetwork::forward_pass(float* train_input, int batch_size, int nWorkers, int nThreadsPerWorkers) {
     
-}
-
-LogisticRegression* copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker) {
-    //define pointer for GPU's copy of the model
-    LogisticRegression* d_model;
-    //allocate space in the GPU memory for the model
-    cudaMalloc(&d_model, sizeof(LogisticRegression));
-
-    //declare all of the pointers that we need on the GPU (weights and gradients) and pass them to device
-    float *d_weights;
-    cudaMalloc(&d_weights, model->nFeatures*model->nClasses*sizeof(float));
-    cudaMemcpy(d_weights, (*model).weights, model->nFeatures*model->nClasses*sizeof(float), cudaMemcpyHostToDevice);
-    float *d_gradients;
-    cudaMalloc(&d_gradients, nThreadsPerWorker*nWorkers*model->nFeatures*model->nClasses*sizeof(float));
-    cudaMemcpy(d_gradients, (*model).gradients, nThreadsPerWorker*nWorkers*model->nFeatures*model->nClasses*sizeof(float), cudaMemcpyHostToDevice);
-    //create temp model
-    LogisticRegression temp = *model;
-    temp.weights = d_weights;
-    temp.gradients = d_gradients;
-    temp.nFeatures = model->nFeatures;
-    temp.nClasses = model->nClasses;
-    //pass temp model to GPU
-    cudaMemcpy(d_model, &temp, sizeof(LogisticRegression), cudaMemcpyHostToDevice);
-    return d_model;
 }
 
 std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
@@ -151,7 +137,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         one_hot[i*(model->nClasses)+train_labels[i][0]] = 1.0;
     }
     //pass labels to GPU
-    float *d_outputs = transferMatrixToDevice(one_hot, total_size, model->nClasses);
+    std::shared_ptr<float> d_outputs = transferMatrixToDevice(one_hot, total_size, model->nClasses);
 
     //initialize array for storing intermediary activation functions on GPU
     /*the super nice thing about the parallelized computation of neural networks is 
@@ -191,7 +177,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     // //initialize array for storing predictions of test set on host
     float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
     float * test_predictions = (float*)malloc(test_size*model->nClasses*sizeof(float));
-    float * d_test_product = transferMatrixToDevice(test_predictions, test_size, model->nClasses);
+    std::shared_ptr<float> d_test_product = transferMatrixToDevice(test_predictions, test_size, model->nClasses);
     //define metrics
     int correct = 0;
     double logLoss = 0.0;
@@ -260,9 +246,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
     cudaFree(d_model->layer_size);
     cudaFree(d_inputs);
     cudaFree(d_test_inputs);
-    cudaFree(d_outputs);
     cudaFree(d_activations);
-    cudaFree(d_test_product);
     cudaFree(d_deltas);
     
     

@@ -16,6 +16,10 @@ TEST(Main, TestBuildModel) {
   EXPECT_EQ(model.nLayers, 1);
   EXPECT_EQ(model.layer_size[0], 1);
   EXPECT_EQ(model.layer_size[1], 2);
+  free(weights[0]);
+  free(weights);
+  free(biases[0]);
+  free(biases);
 }
 
 TEST(Main, TestCopyModelToGPU) {
@@ -26,7 +30,7 @@ TEST(Main, TestCopyModelToGPU) {
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
   model.on_device = true;
   std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
-  NeuralNetwork *temp = new NeuralNetwork;
+  std::shared_ptr<NeuralNetwork> temp = std::make_shared<NeuralNetwork>();
   temp->weights = new float*[1];
   temp->biases = new float*[1];
   temp->layer_size = new int[2];
@@ -41,6 +45,11 @@ TEST(Main, TestCopyModelToGPU) {
   EXPECT_EQ(temp->layer_size[1], 2);
   EXPECT_FLOAT_EQ(temp_biases[0], 0.4f);
   EXPECT_FLOAT_EQ(temp_biases[1], 0.3f);
-  printf("Success\n");
+  free(temp_biases);
+  free(temp_weights);
+  free(weights[0]);
+  free(weights);
+  free(biases[0]);
+  free(biases);
 
 }

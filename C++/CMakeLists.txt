@@ -8,7 +8,7 @@ project(NEURAL_NET VERSION 1.0 LANGUAGES CXX CUDA)
 # C++ Options #
 ###############
 # Enable C++11
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Set include directories
 message("--Source directory: ${NEURAL_NET_SOURCE_DIR}")
@@ -19,7 +19,7 @@ file(GLOB SRC ${NEURAL_NET_SOURCE_DIR}/src/*cpp ${NEURAL_NET_SOURCE_DIR}/src/*cu
 message("--src: ${SRC}")
 
 # Get executable files
-file(GLOB EXECLIST ${NEURAL_NET_SOURCE_DIR}/bin/main.cu ${NEURAL_NET_SOURCE_DIR}/bin/tests.cu)
+file(GLOB EXECLIST ${NEURAL_NET_SOURCE_DIR}/bin/main.cu)
 message("--Exec List: ${EXECLIST}")
 
 ####Google Test #####
