@@ -4,6 +4,7 @@
 #include <chrono> 
 #include <iostream>
 #include <cublas_v2.h>
+#include <memory>
 
 void free2DArrayFromDevice(float ** array, int * array_size) {
 
@@ -74,7 +75,7 @@ LogisticRegression* copyModelToGPU(LogisticRegression *model, int nWorkers, int 
     return d_model;
 }
 
-NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
+std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
     int * nLayers;
     float **d_weights;
     float **d_biases;
@@ -107,7 +108,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     cudaMemcpy(d_biases, temp_biases, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
     cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     cudaMemcpy(d_weights, temp_weights, (model->nLayers)*sizeof(float*), cudaMemcpyHostToDevice);
-    NeuralNetwork *temp = new NeuralNetwork();
+    std::shared_ptr<NeuralNetwork> temp = std::make_shared<NeuralNetwork>();
     temp->nClasses = model->nClasses;
     temp->nLayers = model->nLayers;
     temp->layer_size = nLayers;
@@ -123,7 +124,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
 
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker, bool useMultiThreaded) {
-    NeuralNetwork *d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+    std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
     //copy train data
     float *d_inputs;
     //copy weights
@@ -210,7 +211,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
             We can create a dim3 of size (nWorkers, 2, 1) as the number of blocks passed to our dot product function
             And a dim3 of size(nThreadsPerWorker, 2, 1) as the number of threads per block
             */
-            predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);    
+            // predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);    
             cudaDeviceSynchronize();
             // // auto endForward = std::chrono::system_clock::now();
             // // std::chrono::duration<double> elapsed_forward = endForward - startForward;
@@ -257,7 +258,6 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
         cudaFree(d_model->grad_biases[i-1]);
     }
     cudaFree(d_model->layer_size);
-    cudaFree(d_model);
     cudaFree(d_inputs);
     cudaFree(d_test_inputs);
     cudaFree(d_outputs);

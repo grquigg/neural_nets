@@ -36,7 +36,7 @@ TEST(SegmentedDotProduct, DotProductMultiThreadedEx1) {
   float **weights = new float*[1]{new float[2]{0.1f, 0.2f}};
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
   NeuralNetwork* model = new NeuralNetwork(1, layers, weights, biases, 1.0f);
-  NeuralNetwork* d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
   float *input = new float[2]{0.13f, 0.42f};
   float *d_input;
   float *d_product;
@@ -283,7 +283,7 @@ TEST(ForwardPass, MultiThreadedThreadedDotProduct2Ex1_BATCH_SIZE_2) {
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
   float *d_input;
-  NeuralNetwork* d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
   cudaMalloc(&d_input, 2*model.layer_size[0]*sizeof(float));
   cudaMemcpy(d_input, input, 2*model.layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
   int activations_size = 0;
@@ -339,7 +339,7 @@ TEST(ForwardPass, MultiThreadedSoftmaxEx1_BATCH_SIZE_1) {
   biases[1] = new float[1]{0.7f};
   NeuralNetwork *model = new NeuralNetwork(nLayers, layers, weights, biases, 1.0f);
   float *d_input;
-  NeuralNetwork* d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
   cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
   cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
   int activations_size = 0;
@@ -398,7 +398,7 @@ TEST(ForwardPass, MultiThreadedSoftmaxEx1_BATCH_SIZE_2) {
   biases[1] = new float[1]{0.7f};
   NeuralNetwork *model = new NeuralNetwork(nLayers, layers, weights, biases, 1.0f);
   float *d_input;
-  NeuralNetwork* d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
   cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
   cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
   int activations_size = 0;
@@ -465,7 +465,7 @@ TEST(ForwardPass, MultiThreadedForwardPassEx2_BATCH_SIZE_1) {
   };
   float * d_input;
   NeuralNetwork* model = new NeuralNetwork(nLayers, layers, weights, biases, 1.0f);
-  NeuralNetwork* d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
   cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
   cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
   int activations_size = 0;
@@ -540,7 +540,7 @@ TEST(ForwardPass, MultiThreadedForwardPassEx2_BATCH_SIZE_2) {
   };
   float * d_input;
   NeuralNetwork* model = new NeuralNetwork(nLayers, layers, weights, biases, 1.0f);
-  NeuralNetwork* d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
   cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
   cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
   int activations_size = 0;
@@ -615,7 +615,7 @@ TEST(ForwardPass, MultiThreadedForwardPassEx2_BATCH_SIZE_2_1) {
   };
   float * d_input;
   NeuralNetwork* model = new NeuralNetwork(nLayers, layers, weights, biases, 1.0f);
-  NeuralNetwork* d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(model, nWorkers, nThreadsPerWorker);
   cudaMalloc(&d_input, 2*model->layer_size[0]*sizeof(float));
   cudaMemcpy(d_input, input, 2*model->layer_size[0]*sizeof(float), cudaMemcpyHostToDevice);
   int activations_size = 0;

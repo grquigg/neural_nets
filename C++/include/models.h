@@ -1,7 +1,9 @@
 #ifndef MODELS_H
 #define MODELS_H
-
+#include <memory>
 float* transferMatrixToDevice(float *matrix, int height, int width);
+void free2DArrayFromDevice(float ** array, int * array_size);
+
 struct LogisticRegression {
     int nFeatures;
     int nClasses;
@@ -36,7 +38,7 @@ class NeuralNetwork {
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
 
-NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker);
+std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker);
 void copyDataToGPU(float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, int total_size, int test_size, int nClasses);
 /*
 The order of the arguments that should be passed into the train function are as follows:
@@ -59,7 +61,6 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker, bool useMultiThreaded);
 
-void free2DArrayFromDevice(float ** array, int * array_size);
 NeuralNetwork* buildModel(int nLayers, int * layer_size, float** weights, float **biases, float lambda, int nThreadsPerWorker, int nWorkers);
 
 #endif

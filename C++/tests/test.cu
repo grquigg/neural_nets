@@ -25,7 +25,7 @@ TEST(Main, TestCopyModelToGPU) {
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
   model.on_device = true;
-  NeuralNetwork* d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
   NeuralNetwork *temp = new NeuralNetwork;
   temp->weights = new float*[1];
   temp->biases = new float*[1];
