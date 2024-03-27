@@ -24,6 +24,7 @@ TEST(Main, TestCopyModelToGPU) {
   float **weights = new float*[1]{new float[2]{0.1f, 0.2f}};
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
+  model.on_device = true;
   NeuralNetwork* d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
   NeuralNetwork *temp = new NeuralNetwork;
   temp->weights = new float*[1];
@@ -31,8 +32,6 @@ TEST(Main, TestCopyModelToGPU) {
   temp->layer_size = new int[2];
   float * temp_weights = new float[2];
   float * temp_biases = new float[2];
-  // cudaMemcpy(temp->weights, d_model->weights, sizeof(float**), cudaMemcpyDeviceToHost);
-  // cudaMemcpy(temp->biases, d_model->biases, sizeof(float**), cudaMemcpyDeviceToHost);
   cudaMemcpy(temp_weights, d_model->weights[0], sizeof(float*), cudaMemcpyDeviceToHost);
   cudaMemcpy(temp_biases, d_model->biases[0], sizeof(float*), cudaMemcpyDeviceToHost);
   cudaMemcpy(temp->layer_size, d_model->layer_size, 2*sizeof(int), cudaMemcpyDeviceToHost);

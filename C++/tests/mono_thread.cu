@@ -22,11 +22,15 @@ TEST(SegmentedDotProduct, SingleThreaded) {
     dotProductSegmented<<<nBlocks, nThreads>>>(darr1, darr2, dproduct, 2, 3, 3, 4);
     cudaDeviceSynchronize();
     cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
     for(int i = 0; i < 2; i++) {
         for(int j = 0; j < 4; j++) {
             EXPECT_EQ(product[i*4+j], correct_ans[i*4+j]);
         }
     }
+    cudaFree(dproduct);
+    cudaFree(darr1);
+    cudaFree(darr2);
 }
 
 TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the Backprop example 1 from 589 HW4
@@ -52,6 +56,7 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the 
   for(int i = 0; i < 4; i++) {
     EXPECT_FLOAT_EQ(prod[i], correct[i]);
   }
+  printf("Done\n");
 }
 
 TEST(SegmentedDotProduct, DotProductSingleThreadedEx2) { //REMEMBER THAT WE'RE TAKING THE TRANSPOSE OF THE MATRIX IN THE EXAMPLE

@@ -1,5 +1,7 @@
 #ifndef MODELS_H
 #define MODELS_H
+
+float* transferMatrixToDevice(float *matrix, int height, int width);
 struct LogisticRegression {
     int nFeatures;
     int nClasses;
@@ -19,6 +21,7 @@ class NeuralNetwork {
         float lambda;
         float ** gradients;
         float ** grad_biases;
+        bool on_device = false;
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);
@@ -56,6 +59,7 @@ int nEpochs, int batch_size, int total_size, int test_size, float learning_rate,
 void train(NeuralNetwork *model, float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, 
 int nEpochs, int batch_size, int total_size, int test_size, float learning_rate, int nWorkers, int nThreadsPerWorker, bool useMultiThreaded);
 
+void free2DArrayFromDevice(float ** array, int * array_size);
 NeuralNetwork* buildModel(int nLayers, int * layer_size, float** weights, float **biases, float lambda, int nThreadsPerWorker, int nWorkers);
 
 #endif

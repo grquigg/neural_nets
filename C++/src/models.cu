@@ -5,6 +5,10 @@
 #include <iostream>
 #include <cublas_v2.h>
 
+void free2DArrayFromDevice(float ** array, int * array_size) {
+
+}
+
 float* transferMatrixToDevice(float *matrix, int height, int width) {
     float* deviceMatrix;
     cudaMalloc(&deviceMatrix, height*width*sizeof(float));
@@ -21,13 +25,15 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
 }
 
 NeuralNetwork::~NeuralNetwork() {
-    for(int i = 0; i < nLayers; i++) {
-        free(this->weights[i]);
-        free(this->biases[i]);
+    std::cout << "Destroy model" << std::endl;
+    if(this->on_device) {
+        std::cout << "On device" << std::endl;
+        for(int i = 0; i < nLayers; i++) {
+            cudaFree(this->weights[i]);
+            cudaFree(this->biases[i]);
+        }
+        cudaFree(this->layer_size);
     }
-    free(this->weights);
-    free(this->biases);
-    free(this->layer_size);
 }
 
 NeuralNetwork::NeuralNetwork() {}
@@ -110,6 +116,7 @@ NeuralNetwork * copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsP
     temp->biases = temp_biases;
     temp->grad_biases = d_grad_biases;
     temp->lambda = model->lambda;
+    temp->on_device = true;
     printf("Success\n");
     return temp;
 }
