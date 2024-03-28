@@ -689,3 +689,58 @@ TEST(ForwardPass, MultiThreadedForwardPassEx2_BATCH_SIZE_2_1) {
   free(biases);
   free(activations);
 }
+
+TEST(ForwardPass, NNForwardPass_Ex1) {
+  float correctOutput[6] = {0.601807f, 0.58078581f, 0.6087355f, 0.59483749f, 1.0f, 1.0f};
+  int nWorkers = 2;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 2;
+  float input[2] = {0.13000f, 0.42f};
+  int *layers = new int[nLayers+1]{1, 2, 1};
+  float **weights = new float*[2];
+  weights[0] = new float[2]{0.1f, 0.2f};
+  weights[1] = new float[2]{0.5f, 0.6f};
+  float **biases = new float*[2];
+  biases[0] = new float[2]{0.4f, 0.3f};
+  biases[1] = new float[1]{0.7f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
+  std::shared_ptr<float> activations;
+  activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 0; j < 6; j++) {
+    EXPECT_EQ(activations.get()[j], correctOutput[j]);
+  }
+}
+
+TEST(ForwardPass, NNForwardPass_Ex2) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float ** weights = new float*[3];
+  weights[0] = new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[1] = new float[12]{0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  weights[2] = new float[6]{0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  float ** biases = new float*[3];
+  biases[0] = new float[4]{0.42f, 0.72f, 0.01f, 0.3f};
+  biases[1] = new float[3]{0.21f, 0.87f, 0.03f};
+  biases[2] = new float[2]{0.04f, 0.17f};
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float expected[18] = {
+    0.67699581f, 0.75384f, 0.58816868f, 0.7056604f,
+    0.63471538f, 0.69291866f, 0.54391158f, 0.64659375f,
+    0.87519467f, 0.8929618f, 0.81480443f,
+    0.86020094f, 0.8833645f, 0.79790765f,
+    0.48506981f, 0.51493f,
+    0.4841319f, 0.51586807f
+  };
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 2);
+  std::shared_ptr<float> activations;
+  activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 0; j < 18; j++) {
+    EXPECT_EQ(activations.get()[j], expected[j]);
+  }
+}

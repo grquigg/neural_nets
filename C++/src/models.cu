@@ -36,9 +36,7 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
 }
 
 NeuralNetwork::~NeuralNetwork() {
-    std::cout << "Destroy model" << std::endl;
     if(this->on_device) {
-        std::cout << "On device" << std::endl;
         for(int i = 0; i < nLayers; i++) {
             cudaFree(this->weights[i]);
             cudaFree(this->biases[i]);
@@ -57,20 +55,50 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
     this->lambda = lambda;
 }
 
-void NeuralNetwork::forward_pass(float* train_input, int batch_size, int nWorkers, int nThreadsPerWorkers) {
-    
+std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) {
+    dim3 nBlocks(nWorkers, 1, 1);
+    dim3 nThreads(nThreadsPerWorkers, 1, 1);
+    int activations_size = 0;
+    int * offsets = new int[this->nLayers];
+    for(int i = 1; i <= this->nLayers; i++) {
+        offsets[i-1] = (batch_size * activations_size);
+        activations_size += this->layer_size[i];
+    }
+    std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(this, nWorkers, nThreadsPerWorkers);
+    std::shared_ptr<int> d_offsets = transferMatrixToDevice(offsets, this->nLayers, 1);
+    float * d_activations;
+    cudaMalloc(&d_activations, batch_size*activations_size*sizeof(float));
+    // for(int i = 0; i < total_size; i+=batch_size) {
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get(), d_model->weights[0], d_activations, batch_size, this->layer_size[0], this->layer_size[0], this->layer_size[1], d_model->biases[0]);
+    cudaDeviceSynchronize();
+    sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations, batch_size*this->layer_size[1]);
+    cudaDeviceSynchronize();
+    int j = 1;
+    for(j = 1; j < this->nLayers-1; j++) {
+        nThreads.y = this->layer_size[j+1];
+        dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+offsets[j-1], d_model->weights[j], d_activations+offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], d_model->biases[j]);
+        cudaDeviceSynchronize();
+        sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+offsets[j], batch_size*this->layer_size[j+1]);
+        cudaDeviceSynchronize();
+    }
+    nThreads.y = this->layer_size[j+1];
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+offsets[j-1], d_model->weights[j], d_activations+offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], d_model->biases[j]);
+    cudaDeviceSynchronize();
+    softmaxSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+(offsets[j]), batch_size, this->layer_size[j+1]);
+    cudaDeviceSynchronize();
+    float* activations = new float[activations_size*batch_size];
+    cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+    std::shared_ptr<float> pointer = std::shared_ptr<float>(activations);
+    return pointer;
 }
 
 std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
-    int * nLayers;
     float **d_weights;
     float **d_biases;
     float **d_gradients;
     float **d_grad_biases;
     //allocate all of the memory that we need to CUDA
-    // cudaMalloc(&d_model, sizeof(NeuralNetwork));
-    cudaMalloc(&nLayers, (model->nLayers+1)*sizeof(int));
-    cudaMemcpy(nLayers, model->layer_size, (model->nLayers+1)*sizeof(int), cudaMemcpyHostToDevice);
+    // std::shared_ptr<int> nLayers = transferMatrixToDevice(model->layer_size, 1, model->nLayers+1);
     // cudaMalloc(&d_weights, (model->nLayers)*sizeof(float*));
     // cudaMalloc(&d_biases, (model->nLayers)*sizeof(float*));
     float **temp_weights = new float*[model->nLayers];
@@ -97,7 +125,6 @@ std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers
     std::shared_ptr<NeuralNetwork> temp = std::make_shared<NeuralNetwork>();
     temp->nClasses = model->nClasses;
     temp->nLayers = model->nLayers;
-    temp->layer_size = nLayers;
     temp->weights = temp_weights;
     temp->gradients = d_gradients;
     temp->biases = temp_biases;

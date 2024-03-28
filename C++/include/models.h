@@ -32,7 +32,9 @@ class NeuralNetwork {
         int nLayers;
         int * layer_size;
         float ** weights;
+        float ** d_weights;
         float ** biases;
+        float ** d_biases;
         float lambda;
         float ** gradients;
         float ** grad_biases;
@@ -44,9 +46,9 @@ class NeuralNetwork {
 
         void train();
 
-        void forward_pass(float* inputs, int batch_size, int nWorker, int nThreadsPerWorker);
+        std::shared_ptr<float> forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) ;
 
-        void backprop();
+        void backprop(float* inputs, float* outputs);
 };
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
