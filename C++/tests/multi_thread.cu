@@ -3,30 +3,6 @@
 #include "../include/utils.h"
 #include "../include/models.h"
 
-TEST(SegmentedDotProduct, MultiThreaded) {
-    int nWorkers = 1, nThreadsPerWorker = 1;
-    dim3 nBlocks(nWorkers, 2, 1);
-    dim3 nThreads(nThreadsPerWorker, 2, 1);
-    float arr1[6] = {1,2,3,4,5,6};
-    float arr2[12] = {-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12};
-    float product[8];
-    float correct_ans[8] = {-38.0f, -44.0f, -50.0f, -56.0f, -83.0f, -98.0f, -113.0f, -128.0f};
-    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
-    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
-    float *dproduct;
-    cudaMalloc(&dproduct, 8*sizeof(float));
-    dotProductSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 3, 4);
-    cudaDeviceSynchronize();
-    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    for(int i = 0; i < 2; i++) {
-        for(int j = 0; j < 4; j++) {
-            EXPECT_EQ(product[i*4+j], correct_ans[i*4+j]);
-        }
-    }
-    cudaFree(dproduct);
-}
-
 TEST(SegmentedDotProduct, DotProductMultiThreadedEx1) {
   int nWorkers = 1, nThreadsPerWorker = 1, batch_size = 2;
   dim3 nBlocks(nWorkers, 1, 1);
@@ -797,6 +773,37 @@ TEST(CalculateDeltas, NNCalculateDeltasLayer3_Ex2) {
   float* d_deltas;
   cudaMalloc(&d_deltas, batch_size*model.layer_size[model.nLayers]*sizeof(float));
   std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 2, 2);
+  matrixSubtract<<<model.layer_size[model.nLayers],batch_size>>>(model.activations+model.offsets[model.nLayers-1], d_y.get(), model.layer_size[model.nLayers], batch_size, model.layer_size[model.nLayers], batch_size, d_deltas);
+  float * deltas = new float[batch_size*model.layer_size[model.nLayers]];
+  cudaMemcpy(deltas, d_deltas, batch_size*model.layer_size[model.nLayers]*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < batch_size*model.layer_size[model.nLayers]; i++) {
+    EXPECT_FLOAT_EQ(correctDeltas[i], deltas[i]);
+  }
+}
+
+TEST(CalculateDeltas, NNCalculateDeltasLayer1_Ex1) {
+  float ys[2] = {0.9f, 0.23f};
+  float correctDeltas[2] = {0.1f, 0.77f};
+  int nWorkers = 2;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 2;
+  float input[2] = {0.13000f, 0.42f};
+  int *layers = new int[nLayers+1]{1, 2, 1};
+  float **weights = new float*[2];
+  weights[0] = new float[2]{0.1f, 0.2f};
+  weights[1] = new float[2]{0.5f, 0.6f};
+  float **biases = new float*[2];
+  biases[0] = new float[2]{0.4f, 0.3f};
+  biases[1] = new float[1]{0.7f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
+  model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  //compute deltas
+  float* d_deltas;
+  std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 1, 2);
+  std::cout << model.layer_size[model.nLayers] << std::endl;
+  cudaMalloc(&d_deltas, batch_size*model.layer_size[model.nLayers]*sizeof(float));
   matrixSubtract<<<model.layer_size[model.nLayers],batch_size>>>(model.activations+model.offsets[model.nLayers-1], d_y.get(), model.layer_size[model.nLayers], batch_size, model.layer_size[model.nLayers], batch_size, d_deltas);
   float * deltas = new float[batch_size*model.layer_size[model.nLayers]];
   cudaMemcpy(deltas, d_deltas, batch_size*model.layer_size[model.nLayers]*sizeof(float), cudaMemcpyDeviceToHost);

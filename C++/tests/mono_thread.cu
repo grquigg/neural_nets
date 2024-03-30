@@ -4,30 +4,6 @@
 #include "../include/models.h"
 #include <memory>
 
-TEST(SegmentedDotProduct, SingleThreaded) {
-    int nWorkers = 1, nThreadsPerWorker = 1;
-    dim3 nBlocks(nWorkers, 1, 1);
-    dim3 nThreads(nThreadsPerWorker, 1, 1);
-    float arr1[6] = {1,2,3,4,5,6};
-    float arr2[12] = {-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12};
-    float product[8];
-    float correct_ans[8] = {-38.0f, -44.0f, -50.0f, -56.0f, -83.0f, -98.0f, -113.0f, -128.0f};
-    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
-    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
-    float *dproduct;
-    cudaMalloc(&dproduct, 8*sizeof(float));
-    dotProductSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 3, 4);
-    cudaDeviceSynchronize();
-    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    for(int i = 0; i < 2; i++) {
-        for(int j = 0; j < 4; j++) {
-            EXPECT_EQ(product[i*4+j], correct_ans[i*4+j]);
-        }
-    }
-    cudaFree(dproduct);
-}
-
 TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the Backprop example 1 from 589 HW4
   int nWorkers = 1, nThreadsPerWorker = 1, batch_size = 2;
   dim3 nBlocks(nWorkers, 1, 1);

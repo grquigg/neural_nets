@@ -3,6 +3,54 @@
 #include "../include/utils.h"
 #include "../include/models.h"
 // Demonstrate some basic assertions.
+TEST(SegmentedDotProduct, SingleThreaded) {
+    int nWorkers = 1, nThreadsPerWorker = 1;
+    dim3 nBlocks(nWorkers, 1, 1);
+    dim3 nThreads(nThreadsPerWorker, 1, 1);
+    float arr1[6] = {1,2,3,4,5,6};
+    float arr2[12] = {-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12};
+    float product[8];
+    float correct_ans[8] = {-38.0f, -44.0f, -50.0f, -56.0f, -83.0f, -98.0f, -113.0f, -128.0f};
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
+    float *dproduct;
+    cudaMalloc(&dproduct, 8*sizeof(float));
+    dotProductSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 3, 4);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 2; i++) {
+        for(int j = 0; j < 4; j++) {
+            EXPECT_EQ(product[i*4+j], correct_ans[i*4+j]);
+        }
+    }
+    cudaFree(dproduct);
+}
+
+TEST(SegmentedDotProduct, MultiThreaded) {
+    int nWorkers = 1, nThreadsPerWorker = 1;
+    dim3 nBlocks(nWorkers, 2, 1);
+    dim3 nThreads(nThreadsPerWorker, 2, 1);
+    float arr1[6] = {1,2,3,4,5,6};
+    float arr2[12] = {-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12};
+    float product[8];
+    float correct_ans[8] = {-38.0f, -44.0f, -50.0f, -56.0f, -83.0f, -98.0f, -113.0f, -128.0f};
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
+    float *dproduct;
+    cudaMalloc(&dproduct, 8*sizeof(float));
+    dotProductSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 3, 4);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 2; i++) {
+        for(int j = 0; j < 4; j++) {
+            EXPECT_EQ(product[i*4+j], correct_ans[i*4+j]);
+        }
+    }
+    cudaFree(dproduct);
+}
+
 
 TEST(Main, TestBuildModel) { 
   int layers[2] = {1, 2};
@@ -67,4 +115,64 @@ TEST(Main, MultiThreadedSubtraction) {
   for(int i = 0; i < 64; i++) {
     EXPECT_FLOAT_EQ(product[i], 1.0f+i);
   }
+}
+
+TEST(Main, MultiThreadedDotProductTransposeMatrix1) {
+    int nWorkers = 1, nThreadsPerWorker = 1;
+    // dim3 nBlocks(nWorkers, 2, 1); //deals with the columns in the first matrix
+    // dim3 nThreads(nThreadsPerWorker, 2, 1); //deals with the column in the second matrix
+    float arr1[6] = {1,4,2,5,3,6}; // 3 x 2 matrix
+    float arr2[12] = {-1,-2,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12}; // 3 x 4 matrix
+    float product[8];
+    float correct_ans[8] = {-38.0f, -44.0f, -50.0f, -56.0f, -83.0f, -98.0f, -113.0f, -128.0f};
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 3, 2);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
+    float *dproduct;
+    cudaMalloc(&dproduct, 8*sizeof(float));
+    dotProductTransposeSegmented<<<1, 1>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 8; i++) {
+        EXPECT_EQ(product[i], correct_ans[i]);
+        product[i] = 0.0f;
+    }
+    dotProductTransposeSegmented<<<2,2>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 8; i++) {
+        EXPECT_EQ(product[i], correct_ans[i]);
+    }
+    cudaFree(dproduct);
+}
+
+TEST(Main, MultiThreadedDotProductTransposeMatrix2) {
+    int nWorkers = 1, nThreadsPerWorker = 1;
+    dim3 nBlocks(nWorkers, 2, 1); //deals with the rows in the first matrix
+    dim3 nThreads(nThreadsPerWorker, 2, 1); //deals with the rows in the second matrix
+    float arr1[6] = {1,2,3,4,5,6}; // 2 x 3 matrix
+    float arr2[12] = {-1,-5,-9,-2,-6,-10,-3,-7,-11,-4,-8,-12}; // 4 x 3 matrix
+    float product[8];
+    float correct_ans[8] = {-38.0f, -44.0f, -50.0f, -56.0f, -83.0f, -98.0f, -113.0f, -128.0f};
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
+    float *dproduct;
+    cudaMalloc(&dproduct, 8*sizeof(float));
+    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 8; i++) {
+        EXPECT_EQ(product[i], correct_ans[i]);
+    }
+    nBlocks.y = 1;
+    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 8; i++) {
+        EXPECT_EQ(product[i], correct_ans[i]);
+    }
+    cudaFree(dproduct);
 }

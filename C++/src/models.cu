@@ -55,6 +55,9 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
     this->lambda = lambda;
 }
 
+void NeuralNetwork::backprop(float* inputs, float* outputs) {
+    
+}
 std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) {
     dim3 nBlocks(nWorkers, 1, 1);
     dim3 nThreads(nThreadsPerWorkers, 1, 1);

@@ -41,6 +41,7 @@ __global__ void setTranspose(NeuralNetwork* model);
 
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
+__global__ void dotProductTransposeSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 //////////GLOBALS////////
 
 __global__ void predict(LogisticRegression* model, float* inputs, float* product, int size);
