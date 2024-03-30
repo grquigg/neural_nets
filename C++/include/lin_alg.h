@@ -14,7 +14,7 @@ __device__ void softmax(float* product, int product_height, int product_width);
 
 __global__ void softmaxSegmented(float* product, int product_height, int product_width);
 
-__device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float * outVec);
+__global__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float * outVec);
 
 __device__ void matrixAdd(float * matrix1, float * matrix2, int m1_h, int m1_w);
 

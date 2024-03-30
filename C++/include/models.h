@@ -39,6 +39,8 @@ class NeuralNetwork {
         float ** gradients;
         float ** grad_biases;
         bool on_device = false;
+        float * activations;
+        int * offsets;
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);

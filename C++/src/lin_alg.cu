@@ -106,13 +106,15 @@ __device__ void dotProductTranspose(float* inputs, float* weights, float * produ
     }
 }
 
-__device__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float* outVec) {
-    if (m1_h == m2_h && m1_w == m2_w) {
-        for (int i = 0; i < m1_h; i++) {
-            for (int j = 0; j < m1_w; j++) {
-                outVec[(i*m1_w)+j] = matrix1[(i*m1_w)+j]-matrix2[(i*m1_w)+j];
-            }
-        }
+__global__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float* outVec) {
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    if((m1_h*m1_w) % (gridDim.x *blockDim.x) != 0) {
+        printf("BAD INPUT\n");
+    }
+    //this can be literally be flattened out to a linear operation
+    int batch_size = (m1_h*m1_w)/(gridDim.x *blockDim.x);
+    for(int i = 0; i < batch_size; i++) {
+        outVec[index*batch_size+i] = matrix1[index*batch_size+i] - matrix2[index*batch_size+i];
     }
 }
 
@@ -176,27 +178,27 @@ __global__ void predict(LogisticRegression* model, float* inputs, float* product
     dotProduct(inputs+(i*(model->nFeatures)*batch), model->weights, product+(i*(model->nClasses)*batch), batch, model->nFeatures, model->nFeatures, model->nClasses);
     softmax(product+(i*(model->nClasses)*batch), batch, (model->nClasses));
 }
-__global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes) {
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    int batch = size / (blockDim.x * gridDim.x);
-    matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, product+(i*n_classes*batch));
-    dotProductTranspose(inputs+(i*batch*n_features), product+(i*batch*n_classes), gradients+(i*n_features*n_classes), batch, n_features, batch, n_classes);
-}
+// __global__ void forward_pass(float* inputs, float* weights, float* outputs, float* product, float* gradients, int size, int n_features, int n_classes) {
+//     int i = blockIdx.x*blockDim.x + threadIdx.x;
+//     int batch = size / (blockDim.x * gridDim.x);
+//     matrixSubtract(product+(i*n_classes*batch), outputs+(i*n_classes*batch), batch, n_classes, batch, n_classes, product+(i*n_classes*batch));
+//     dotProductTranspose(inputs+(i*batch*n_features), product+(i*batch*n_classes), gradients+(i*n_features*n_classes), batch, n_features, batch, n_classes);
+// }
 
-__global__ void forward_pass(LogisticRegression* model, float* inputs, float* outputs, float* product, int size, int nClasses) {
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    int batch = size / (blockDim.x * gridDim.x);
-    matrixSubtract(product+(i*nClasses*batch), outputs+(i*nClasses*batch), batch, nClasses, batch, nClasses, product+(i*nClasses*batch));
-    dotProductTranspose(inputs+(i*batch*(model->nFeatures)), product+(i*batch*(model->nClasses)), ((*model).gradients)+(i*(model->nClasses)*(model->nFeatures)), batch, (model->nFeatures), batch, (model->nClasses));
-}
+// __global__ void forward_pass(LogisticRegression* model, float* inputs, float* outputs, float* product, int size, int nClasses) {
+//     int i = blockIdx.x*blockDim.x + threadIdx.x;
+//     int batch = size / (blockDim.x * gridDim.x);
+//     matrixSubtract(product+(i*nClasses*batch), outputs+(i*nClasses*batch), batch, nClasses, batch, nClasses, product+(i*nClasses*batch));
+//     dotProductTranspose(inputs+(i*batch*(model->nFeatures)), product+(i*batch*(model->nClasses)), ((*model).gradients)+(i*(model->nClasses)*(model->nFeatures)), batch, (model->nFeatures), batch, (model->nClasses));
+// }
 
-__global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes) {
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    //BATCH_SIZE*n_classes length vector
-    int batch = n_features / (blockDim.x * gridDim.x);
-    matrixMultiplyByScalar(gradients+(i*batch*n_classes), batch, n_classes, learning_rate/(float) batch_size);
-    matrixSubtract(weights+(i*n_classes*batch), gradients+(i*n_classes*batch), batch, n_classes, batch, n_classes, weights+(i*n_classes*batch));
-}
+// __global__ void backward_pass(float* weights, float * gradients, int batch_size, float learning_rate, int n_features, int n_classes) {
+//     int i = blockIdx.x*blockDim.x + threadIdx.x;
+//     //BATCH_SIZE*n_classes length vector
+//     int batch = n_features / (blockDim.x * gridDim.x);
+//     matrixMultiplyByScalar(gradients+(i*batch*n_classes), batch, n_classes, learning_rate/(float) batch_size);
+//     matrixSubtract(weights+(i*n_classes*batch), gradients+(i*n_classes*batch), batch, n_classes, batch, n_classes, weights+(i*n_classes*batch));
+// }
 
 __global__ void backward_pass(LogisticRegression* model, int batch_size, float learning_rate) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -239,64 +241,64 @@ __global__ void predict(NeuralNetwork* model, float* inputs, float* product, int
     }
 }
 
-__global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int * offsets, int size, int nClasses) {
-    int index = blockIdx.x*blockDim.x + threadIdx.x;
-    float items = size / (float) (blockDim.x * gridDim.x);
-    int batch = ceil(items);
-    if (index * batch >= size) {
-        return;
-    }
-    /*
-    to do the forward pass, we need to take the dot product of the current activations and the previous activations. This is gonna take some effort, so maybe we should
-    */
-    /*Step 1: Subtract current predictions from the actual output (same step as in logistic regression)
-    But there's a caveat involved in where we actually store the results*/
-    int currentLayer = model->nLayers-1;
-    float* current = activations+offsets[currentLayer]+(index*nClasses*batch);
-    float* out = outputs+(index*nClasses*batch);
-    float* deltaPtr = deltas+offsets[currentLayer]+(index*nClasses*batch);
-    int batch_size = min(size-(index*batch), batch);
-    //compute deltas for the last layer;
-    matrixSubtract(current, out, batch_size, model->layer_size[currentLayer+1], batch_size, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
-    int bias_index = model->layer_size[currentLayer+1]*index;
-    // printf("Bias index %d\n", bias_index);
-    for(int j = 0; j < model->layer_size[currentLayer+1]; j++) {
-        model->grad_biases[currentLayer][bias_index+j] = 0.0;
-        for(int i = 0; i < batch_size; i++) {
-            // printf("Delta ptr %d %d %f\n", index, i, deltaPtr[i*model->layer_size[currentLayer+1]+j]);
-            model->grad_biases[currentLayer][bias_index+j] += deltaPtr[i*model->layer_size[currentLayer+1]+j];
-        }
-    }
-    // //main loop
-    for(int i = currentLayer; i > 0; i--) {
-        dotProductTranspose(deltaPtr, model->weights[i], deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i], model->layer_size[i+1]);
-        deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
-        current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
+// __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int * offsets, int size, int nClasses) {
+//     int index = blockIdx.x*blockDim.x + threadIdx.x;
+//     float items = size / (float) (blockDim.x * gridDim.x);
+//     int batch = ceil(items);
+//     if (index * batch >= size) {
+//         return;
+//     }
+//     /*
+//     to do the forward pass, we need to take the dot product of the current activations and the previous activations. This is gonna take some effort, so maybe we should
+//     */
+//     /*Step 1: Subtract current predictions from the actual output (same step as in logistic regression)
+//     But there's a caveat involved in where we actually store the results*/
+//     int currentLayer = model->nLayers-1;
+//     float* current = activations+offsets[currentLayer]+(index*nClasses*batch);
+//     float* out = outputs+(index*nClasses*batch);
+//     float* deltaPtr = deltas+offsets[currentLayer]+(index*nClasses*batch);
+//     int batch_size = min(size-(index*batch), batch);
+//     //compute deltas for the last layer;
+//     matrixSubtract(current, out, batch_size, model->layer_size[currentLayer+1], batch_size, model->layer_size[currentLayer+1], deltaPtr); //[10X10 vector]
+//     int bias_index = model->layer_size[currentLayer+1]*index;
+//     // printf("Bias index %d\n", bias_index);
+//     for(int j = 0; j < model->layer_size[currentLayer+1]; j++) {
+//         model->grad_biases[currentLayer][bias_index+j] = 0.0;
+//         for(int i = 0; i < batch_size; i++) {
+//             // printf("Delta ptr %d %d %f\n", index, i, deltaPtr[i*model->layer_size[currentLayer+1]+j]);
+//             model->grad_biases[currentLayer][bias_index+j] += deltaPtr[i*model->layer_size[currentLayer+1]+j];
+//         }
+//     }
+//     // //main loop
+//     for(int i = currentLayer; i > 0; i--) {
+//         dotProductTranspose(deltaPtr, model->weights[i], deltas+offsets[i-1]+(index*model->layer_size[i]*batch), batch_size, model->layer_size[i+1], model->layer_size[i], model->layer_size[i+1]);
+//         deltaPtr = deltas+offsets[i-1]+(index*model->layer_size[i]*batch);
+//         current = activations+offsets[i-1]+((index*model->layer_size[i]*batch));
 
-        //mulitply delta by the derivative of the sigmoid function
-        sigmoidD(current, batch_size, model->layer_size[i], deltaPtr);
+//         //mulitply delta by the derivative of the sigmoid function
+//         sigmoidD(current, batch_size, model->layer_size[i], deltaPtr);
 
-        //compute gradients with respect to the biases
-        bias_index = model->layer_size[i]*index;
-        for(int j = 0; j < model->layer_size[i]; j++) {
-            model->grad_biases[i-1][bias_index+j] = 0.0;
-            for(int k = 0; k < batch_size; k++) {
-                model->grad_biases[i-1][bias_index+j] += deltaPtr[k*(model->layer_size[i])+j];
-            }
-        }
-    }
-    currentLayer = model->nLayers-1;
-    float * activationPtr; 
-    for(int i = currentLayer; i > 0; i--) {
-        deltaPtr = deltas+offsets[i]+(index*model->layer_size[i+1]*batch);
-        activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
-        int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
-        dotProductTranspose(activationPtr, deltaPtr, model->gradients[i]+gradientIndex, batch_size, model->layer_size[i], batch_size, model->layer_size[i+1]);
-    }
-    deltaPtr = deltas+(index*model->layer_size[1]*batch);
-    int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
-    dotProductTranspose(inputs+(model->layer_size[0]*batch*index), deltaPtr, model->gradients[0]+gradientIndex, batch_size, model->layer_size[0], batch_size, model->layer_size[1]);
-}
+//         //compute gradients with respect to the biases
+//         bias_index = model->layer_size[i]*index;
+//         for(int j = 0; j < model->layer_size[i]; j++) {
+//             model->grad_biases[i-1][bias_index+j] = 0.0;
+//             for(int k = 0; k < batch_size; k++) {
+//                 model->grad_biases[i-1][bias_index+j] += deltaPtr[k*(model->layer_size[i])+j];
+//             }
+//         }
+//     }
+//     currentLayer = model->nLayers-1;
+//     float * activationPtr; 
+//     for(int i = currentLayer; i > 0; i--) {
+//         deltaPtr = deltas+offsets[i]+(index*model->layer_size[i+1]*batch);
+//         activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
+//         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
+//         dotProductTranspose(activationPtr, deltaPtr, model->gradients[i]+gradientIndex, batch_size, model->layer_size[i], batch_size, model->layer_size[i+1]);
+//     }
+//     deltaPtr = deltas+(index*model->layer_size[1]*batch);
+//     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
+//     dotProductTranspose(inputs+(model->layer_size[0]*batch*index), deltaPtr, model->gradients[0]+gradientIndex, batch_size, model->layer_size[0], batch_size, model->layer_size[1]);
+// }
 
 __global__ void auditDeltas(NeuralNetwork* model, float * deltas, int* offsets, int batches, int batch_size) {
     float* deltaPtr;

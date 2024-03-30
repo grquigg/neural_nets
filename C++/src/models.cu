@@ -59,13 +59,13 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
     dim3 nBlocks(nWorkers, 1, 1);
     dim3 nThreads(nThreadsPerWorkers, 1, 1);
     int activations_size = 0;
-    int * offsets = new int[this->nLayers];
+    this->offsets = new int[this->nLayers];
     for(int i = 1; i <= this->nLayers; i++) {
-        offsets[i-1] = (batch_size * activations_size);
+        this->offsets[i-1] = (batch_size * activations_size);
         activations_size += this->layer_size[i];
     }
     std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(this, nWorkers, nThreadsPerWorkers);
-    std::shared_ptr<int> d_offsets = transferMatrixToDevice(offsets, this->nLayers, 1);
+    std::shared_ptr<int> d_offsets = transferMatrixToDevice(this->offsets, this->nLayers, 1);
     float * d_activations;
     cudaMalloc(&d_activations, batch_size*activations_size*sizeof(float));
     // for(int i = 0; i < total_size; i+=batch_size) {
@@ -76,20 +76,20 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
     int j = 1;
     for(j = 1; j < this->nLayers-1; j++) {
         nThreads.y = this->layer_size[j+1];
-        dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+offsets[j-1], d_model->weights[j], d_activations+offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], d_model->biases[j]);
+        dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], d_model->weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], d_model->biases[j]);
         cudaDeviceSynchronize();
-        sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+offsets[j], batch_size*this->layer_size[j+1]);
+        sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+this->offsets[j], batch_size*this->layer_size[j+1]);
         cudaDeviceSynchronize();
     }
     nThreads.y = this->layer_size[j+1];
-    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+offsets[j-1], d_model->weights[j], d_activations+offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], d_model->biases[j]);
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], d_model->weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], d_model->biases[j]);
     cudaDeviceSynchronize();
-    softmaxSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+(offsets[j]), batch_size, this->layer_size[j+1]);
+    softmaxSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+(this->offsets[j]), batch_size, this->layer_size[j+1]);
     cudaDeviceSynchronize();
-    float* activations = new float[activations_size*batch_size];
+    float * activations = new float[activations_size*batch_size];
     cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
-    std::shared_ptr<float> pointer = std::shared_ptr<float>(activations);
-    return pointer;
+    this->activations = d_activations;
+    return std::shared_ptr<float>(activations);
 }
 
 std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker) {
@@ -131,7 +131,6 @@ std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers
     temp->grad_biases = d_grad_biases;
     temp->lambda = model->lambda;
     temp->on_device = true;
-    printf("Success\n");
     return temp;
 }
 

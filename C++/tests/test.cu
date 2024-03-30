@@ -51,3 +51,20 @@ TEST(Main, TestCopyModelToGPU) {
   free(biases);
 
 }
+
+TEST(Main, MultiThreadedSubtraction) {
+  float input[64];
+  float product[64];
+  for(int i = 0; i < 64; i++) {
+    input[i] = 1.0f;
+    product[i] = -i;
+  }
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 8, 8);
+  std::shared_ptr<float> d_product = transferMatrixToDevice(product, 8, 8);
+  //this should just call the matrixSubtract method from lin_alg.cu directly
+  matrixSubtract<<<8,8>>>(d_input.get(), d_product.get(), 8, 8, 8, 8, d_product.get());
+  cudaMemcpy(product, d_product.get(), 64*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < 64; i++) {
+    EXPECT_FLOAT_EQ(product[i], 1.0f+i);
+  }
+}
