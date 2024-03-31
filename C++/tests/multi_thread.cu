@@ -681,6 +681,7 @@ TEST(ForwardPass, NNForwardPass_Ex1) {
   biases[0] = new float[2]{0.4f, 0.3f};
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nThreadsPerWorker*nWorkers);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
   std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
   for(int j = 0; j < 6; j++) {
@@ -975,4 +976,29 @@ TEST(CalculateDeltas, NNCalculateDeltasLayer0_Ex2) {
   for(int i = 0; i < batch_size*model.layer_size[model.nLayers-2]; i++) {
     EXPECT_FLOAT_EQ(correctDeltas[i], deltas[i]);
   }
+}
+
+TEST(CalculateDeltas, NNExample1) {
+  int nWorkers = 2;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 2;
+  float input[2] = {0.13000f, 0.42f};
+  float ys[2] = {0.9f, 0.23f};
+  int *layers = new int[nLayers+1]{1, 2, 1};
+  float **weights = new float*[2];
+  weights[0] = new float[2]{0.1f, 0.2f};
+  weights[1] = new float[2]{0.5f, 0.6f};
+  float **biases = new float*[2];
+  biases[0] = new float[2]{0.4f, 0.3f};
+  biases[1] = new float[1]{0.7f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
+  std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 1, 2);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  model.setupDeltas(batch_size);
+  model.backprop(batch_size, d_input, d_y);
+  // for(int j = 0; j < 6; j++) {
+  //   EXPECT_FLOAT_EQ(activations.get()[j], correctOutput[j]);
+  // }
 }

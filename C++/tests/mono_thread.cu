@@ -153,7 +153,8 @@ TEST(ForwardPass, SingleThreadedDotProduct2Ex1_BATCH_SIZE_1) {
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 2);
-  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker);
+  // std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
   for(int i = 1; i <= model.nLayers; i++) {
@@ -172,12 +173,13 @@ TEST(ForwardPass, SingleThreadedDotProduct2Ex1_BATCH_SIZE_1) {
   std::shared_ptr<float> d_activations = transferMatrixToDevice(activations, batch_size, activations_size);
   dim3 nBlocks(nWorkers, 1, 1);
   dim3 nThreads(nThreadsPerWorker, 1, 1);
+  std::cout << "Alright" << std::endl;
   for(int i = 0; i < 2; i+=1) {
-    dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get()+(i*model.layer_size[0]), d_model->weights[0], d_activations.get(), batch_size, model.layer_size[0], model.layer_size[0], model.layer_size[1], d_model->biases[0]);
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get()+(i*model.layer_size[0]), model.d_weights[0], d_activations.get(), batch_size, model.layer_size[0], model.layer_size[0], model.layer_size[1], model.d_biases[0]);
     cudaDeviceSynchronize();
     sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(d_activations.get(), batch_size*model.layer_size[1]);
     cudaDeviceSynchronize();
-    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations.get(), d_model->weights[1], d_activations.get()+(offsets[1]*batch_size), batch_size, model.layer_size[1], model.layer_size[1], model.layer_size[2], d_model->biases[1]);
+    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations.get(), model.d_weights[1], d_activations.get()+(offsets[1]*batch_size), batch_size, model.layer_size[1], model.layer_size[1], model.layer_size[2], model.d_biases[1]);
     cudaDeviceSynchronize();
     cudaMemcpy(activations, d_activations.get(), activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
     for(int j = 0; j < activations_size; j++) {

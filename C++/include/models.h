@@ -40,6 +40,7 @@ class NeuralNetwork {
         float ** grad_biases;
         bool on_device = false;
         float * activations;
+        float ** deltas;
         int * offsets;
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
@@ -48,9 +49,13 @@ class NeuralNetwork {
 
         void train();
 
+        void setupDeltas(int batch_size);
+
         std::shared_ptr<float> forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) ;
 
-        void backprop(float* inputs, float* outputs);
+        void setupGPU(int nWorkers);
+
+        void backprop(int batch_size, std::shared_ptr<float> inputs, std::shared_ptr<float> outputs);
 };
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
