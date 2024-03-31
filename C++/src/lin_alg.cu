@@ -27,11 +27,15 @@ __device__ void sigmoid(float* inputs, int size) {
         inputs[i] = (1/ (1+expf(-inputs[i])));
     }
 }
-__device__ void sigmoidD(float* activations, int height, int width, float * delta) {
-    for(int i = 0; i < height; i++) {
-        for(int j = 0; j < width; j++) {
-            delta[i*width+j] *= activations[i*width+j] * (1-activations[i*width+j]);
-        }
+__global__ void sigmoidD(float* activations, int height, int width, float * delta) {
+    if((height * width) % (gridDim.x * blockDim.x) != 0) {
+        printf("Bad outcome\n");
+    }
+    printf("Sigmoid\n");
+    int batch = (height * width) / (gridDim.x * blockDim.x);
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    for(int i = 0; i < batch; i++) {
+        delta[index*batch+i] *= activations[index*batch+i] * (1-activations[index*batch+i]);
     }
 }
 __device__ float* transposeMatrix(float * matrix, int matrix_height, int matrix_width) {
@@ -80,28 +84,30 @@ __device__ void dotProduct(float* inputs, float* weights, float * product, int v
         }
     }
 }
-__global__ void dotProductTransposeSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
-    if(vector_h == weight_h) {
+__global__ void dotProductTransposeSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, bool useHeight) {
+    if(useHeight && vector_h == weight_h) {
         if(vector_w % (gridDim.x * gridDim.y) != 0 || weight_w % (blockDim.x * blockDim.y) != 0) {
             printf("BAD RESULT\n");
             return;
         }
-        int batch_size_x = vector_w / (gridDim.x * gridDim.y);
-        int batch_size_y = weight_w / (blockDim.x * blockDim.y);
+        printf("Vector w %d weight w %d\n", vector_w, weight_w);
+        int batch_size_x = vector_w / (gridDim.x);
+        int batch_size_y = weight_w / (blockDim.x);
         int index_x = blockIdx.x;
         int index_y = threadIdx.x;
-        // printf("Batch size x %d Batch size y %d\n", batch_size_x, batch_size_y);
+        printf("Batch size x %d Batch size y %d\n", batch_size_x, batch_size_y);
         printf("Index x %d, Index y %d\n", index_x, index_y);
         //index_x*batch_size_x indicates the starting row of the input matrix
         //index_x*batch_size_x*weight_x indicates the starting row of the product matrix
         //index_y*batch_size_y indicates the starting column of the weight matrix
         for(int i = 0; i < batch_size_x; i++) { //
             for(int j = 0; j < batch_size_y; j++) {
-                // printf("starting column in inputs: %d\nstarting column in weights: %d\n\n", index_x*batch_size_x+i, index_y*batch_size_y+j);
+                printf("starting column in inputs: %d\nstarting column in weights: %d\n\n", index_x*batch_size_x+i, index_y*batch_size_y+j);
                 product[(index_x*batch_size_x+i)*weight_w+(index_y*batch_size_y+j)] = 0.0f;
                 for(int k = 0; k < vector_h; k++) {
                     product[(index_x*batch_size_x+i)*weight_w+(index_y*batch_size_y+j)] += inputs[index_x*batch_size_x+i+(vector_w*k)] * weights[index_y*batch_size_y+j+(weight_w*k)];
                 }
+                printf("%f\n", product[(index_x*batch_size_x+i)*weight_w+(index_y*batch_size_y+j)]);
             }
         }
     } else if(vector_w == weight_w) {
@@ -117,23 +123,14 @@ __global__ void dotProductTransposeSegmented(float* inputs, float* weights, floa
         // printf("Index x %d, Index y %d\n", index_x, index_y);
         for(int i = 0; i < batch_size_x; i++) {
             for(int j = 0; j < batch_size_y; j++) {
-                // printf("Index at x %d index at y %d, Start position in product array %d\n", index_x*batch_size_x+i, index_y*batch_size_y+j, (index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j);
+                printf("Index at x %d index at y %d, Start position in product array %d\n", index_x*batch_size_x+i, index_y*batch_size_y+j, (index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j);
                 product[(index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j] = 0.0f;
                 for(int k = 0; k < vector_w; k++) {
                     product[(index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j] += inputs[(index_x*batch_size_x+i)*vector_w+k] * weights[(index_y*batch_size_y+j)*weight_w+k];
                 }
+                printf("%f\n", product[(index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j]);
             }
         }
-        // for(int i = index_x*batch_size_x; i < index_x*batch_size_x+batch_size_x; i++) {
-        //     for(int j = index_y*batch_size_y; j < index_y*batch_size_y+batch_size_y; j++) {
-        //         printf("Index x %d, Index y %d Index in arr %d\n", index_x, index_y, j*weight_h+i);
-        //         product[j*weight_h+i] = 0.0;
-        //         for(int k = 0; k < vector_w; k++) {
-        //             product[j*weight_h+i] += inputs[i*vector_w+k] * weights[j*weight_w+k];
-        //         }
-        //         printf("Product at %d: %f\n", j*weight_h+i, product[j*weight_h+i]);
-        //     }
-        // }
     }
 }
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {

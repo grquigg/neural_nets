@@ -22,8 +22,7 @@ __device__ void matrixMultiplyByScalar(float* matrix, int m1_h, int m1_w, float 
 
 __device__ void sigmoid(float* inputs, int size);
 
-__device__ void sigmoidD(float* activations, int height, int width, float * delta);
-
+__global__ void sigmoidD(float* activations, int height, int width, float * delta);
 
 __global__ void sigmoidSegmented(float * inputs, int inputSize);
 
@@ -41,7 +40,7 @@ __global__ void setTranspose(NeuralNetwork* model);
 
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
-__global__ void dotProductTransposeSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
+__global__ void dotProductTransposeSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, bool useHeight);
 //////////GLOBALS////////
 
 __global__ void predict(LogisticRegression* model, float* inputs, float* product, int size);

@@ -129,7 +129,7 @@ TEST(Main, MultiThreadedDotProductTransposeMatrix1) {
     std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
     float *dproduct;
     cudaMalloc(&dproduct, 8*sizeof(float));
-    dotProductTransposeSegmented<<<1, 1>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4);
+    dotProductTransposeSegmented<<<1, 1>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4, true);
     cudaDeviceSynchronize();
     cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
@@ -137,7 +137,15 @@ TEST(Main, MultiThreadedDotProductTransposeMatrix1) {
         EXPECT_EQ(product[i], correct_ans[i]);
         product[i] = 0.0f;
     }
-    dotProductTransposeSegmented<<<2,2>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4);
+    dotProductTransposeSegmented<<<2,2>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4, true);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 8; i++) {
+        EXPECT_EQ(product[i], correct_ans[i]);
+        product[i] = 0.0f;
+    }
+    dotProductTransposeSegmented<<<2,4>>>(darr1.get(), darr2.get(), dproduct, 3, 2, 3, 4, true);
     cudaDeviceSynchronize();
     cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
@@ -159,7 +167,7 @@ TEST(Main, MultiThreadedDotProductTransposeMatrix2) {
     std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
     float *dproduct;
     cudaMalloc(&dproduct, 8*sizeof(float));
-    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3);
+    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3, true);
     cudaDeviceSynchronize();
     cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
@@ -167,7 +175,15 @@ TEST(Main, MultiThreadedDotProductTransposeMatrix2) {
         EXPECT_EQ(product[i], correct_ans[i]);
     }
     nBlocks.y = 1;
-    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3);
+    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3, true);
+    cudaDeviceSynchronize();
+    cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    for(int i = 0; i < 8; i++) {
+        EXPECT_EQ(product[i], correct_ans[i]);
+    }
+    nThreads.y = 1;
+    dotProductTransposeSegmented<<<nBlocks, nThreads>>>(darr1.get(), darr2.get(), dproduct, 2, 3, 4, 3, true);
     cudaDeviceSynchronize();
     cudaMemcpy(product, dproduct, 8*sizeof(float), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
