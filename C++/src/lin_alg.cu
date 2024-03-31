@@ -525,7 +525,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     }
     int size_x = batch_size / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
-    printf("Start for %d %d %d\n", index, index*batch_size*vector_w, index*batch_size*weight_w);
+    // printf("Start for %d %d %d\n", index, index*batch_size*vector_w, index*batch_size*weight_w);
     float* out = product+(index*batch_size*weight_w)+(size_x*index_x*weight_w)+(size_y*index_y); 
     float* input = inputs+(index*batch_size*vector_w)+((size_x*index_x*vector_w));
     float* weight = weights+(size_y*index_y);
@@ -534,7 +534,6 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
             out[i*weight_w+j] = 0.0;
             for(int k = 0; k < vector_w; k++) { //we compute the kth entry in row i of the INPUTS times the kth entry in column j of the WEIGHTS
                 out[i*weight_w+j] += input[i*vector_w+k] * weight[k*weight_w+j];
-                // printf("This %d %d %f %f\n", i, j, inputs[i*vector_w+k], weights[k*weight_w+j]);
             }
             out[i*weight_w+j] += bias[j+(index_y*size_y)];
         }

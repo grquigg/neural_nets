@@ -76,8 +76,7 @@ TEST(Main, TestCopyModelToGPU) {
   float **weights = new float*[1]{new float[2]{0.1f, 0.2f}};
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
-  model.on_device = true;
-  std::shared_ptr<NeuralNetwork> d_model = copyModelToGPU(&model, nWorkers, nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker);
   std::shared_ptr<NeuralNetwork> temp = std::make_shared<NeuralNetwork>();
   temp->weights = new float*[1];
   temp->biases = new float*[1];
@@ -85,8 +84,8 @@ TEST(Main, TestCopyModelToGPU) {
   float * temp_weights = new float[2];
   float * temp_biases = new float[2];
   printf("%d\n", temp->layer_size[0]);
-  cudaMemcpy(temp_weights, d_model->weights[0], sizeof(float*), cudaMemcpyDeviceToHost);
-  cudaMemcpy(temp_biases, d_model->biases[0], sizeof(float*), cudaMemcpyDeviceToHost);
+  cudaMemcpy(temp_weights, model.d_weights[0], sizeof(float*), cudaMemcpyDeviceToHost);
+  cudaMemcpy(temp_biases, model.d_biases[0], sizeof(float*), cudaMemcpyDeviceToHost);
   EXPECT_FLOAT_EQ(temp_weights[0], 0.1f);
   EXPECT_FLOAT_EQ(temp_weights[1], 0.2f);
   EXPECT_FLOAT_EQ(temp_biases[0], 0.4f);

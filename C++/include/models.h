@@ -60,8 +60,6 @@ class NeuralNetwork {
 
 LogisticRegression * copyModelToGPU(LogisticRegression *model, int nWorkers, int nThreadsPerWorker);
 
-std::shared_ptr<NeuralNetwork> copyModelToGPU(NeuralNetwork *model, int nWorkers, int nThreadsPerWorker);
-void copyDataToGPU(float* train_input, std::vector<std::vector<int>>& train_labels, float* test_input, std::vector<std::vector<int>>& test_labels, int total_size, int test_size, int nClasses);
 /*
 The order of the arguments that should be passed into the train function are as follows:
 1. Reference to the HOST model struct
