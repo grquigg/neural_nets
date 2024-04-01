@@ -3,7 +3,6 @@
 #include "../include/lin_alg.h"
 #include <chrono> 
 #include <iostream>
-#include <cublas_v2.h>
 #include <memory>
 
 void free2DArrayFromDevice(float ** array, int * array_size) {
@@ -101,14 +100,22 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
         sigmoidD<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
         cudaDeviceSynchronize();
     }
-    // for(int i = this->nLayers - 1; i > 0; i--) {
-    //     std::cout << "Layer " << i << std::endl;
-    //     dotProductTransposeSegmented<<<batch_size, this->layer_size[i-1]>>>(this->deltas[i], this->d_weights[i], this->deltas[i-1], batch_size, this->layer_size[i], this->layer_size[i-1], this->layer_size[i], false);
-    //     cudaDeviceSynchronize();
-    //     // sigmoidD<<<batch_size, this->layer_size[i-1]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
-    //     // cudaDeviceSynchronize();
-    // }
-    std::cout << "Made it to the end" << std::endl;
+    std::cout << "Compute gradients" << std::endl;
+    int i = 1;
+    dotProductTransposeSegmented<<<1,1>>>(this->activations+this->offsets[i-1], this->deltas[i], this->gradients[i], batch_size, this->layer_size[i], batch_size, this->layer_size[i+1], true);
+    i = 0;
+    dotProductTransposeSegmented<<<1,1>>>(inputs.get(), this->deltas[i], this->gradients[i], batch_size, this->layer_size[i], batch_size, this->layer_size[i+1], true);
+    //     currentLayer = model->nLayers-1;
+//     float * activationPtr; 
+//     for(int i = currentLayer; i > 0; i--) {
+//         deltaPtr = deltas+offsets[i]+(index*model->layer_size[i+1]*batch);
+//         activationPtr = activations+offsets[i-1]+((index*model->layer_size[i]*batch)); 
+//         int gradientIndex = (index*model->layer_size[i+1]*model->layer_size[i]);
+//         dotProductTranspose(activationPtr, deltaPtr, model->gradients[i]+gradientIndex, batch_size, model->layer_size[i], batch_size, model->layer_size[i+1]);
+//     }
+//     deltaPtr = deltas+(index*model->layer_size[1]*batch);
+//     int gradientIndex = (index*model->layer_size[0]*model->layer_size[1]);
+//     dotProductTranspose(inputs+(model->layer_size[0]*batch*index), deltaPtr, model->gradients[0]+gradientIndex, batch_size, model->layer_size[0], batch_size, model->layer_size[1]);
 }
 
 std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) {
@@ -130,12 +137,14 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
     cudaDeviceSynchronize();
     int j = 1;
     for(j = 1; j < this->nLayers-1; j++) {
+        std::cout << "Layer " << j << std::endl;
         nThreads.y = this->layer_size[j+1];
         dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
         cudaDeviceSynchronize();
         sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+this->offsets[j], batch_size*this->layer_size[j+1]);
         cudaDeviceSynchronize();
     }
+    std::cout << "Layer " << j << std::endl;
     nThreads.y = this->layer_size[j+1];
     dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
     cudaDeviceSynchronize();

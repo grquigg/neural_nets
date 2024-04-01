@@ -6,7 +6,8 @@
 #include "../include/utils.h"
 #include "../include/lin_alg.h"
 #include "../include/models.h"
-#include <chrono> 
+#include <chrono>
+#include <memory>
 
 int main(int argc, char** argv) {
     ////HYPERPARAMS////
@@ -65,25 +66,20 @@ int main(int argc, char** argv) {
     //define our model on the host side
 
     //NEURAL NETWORK
-    NeuralNetwork* model = new NeuralNetwork;
-    model->nClasses = numClasses;
-    model->nLayers = 2;
-    model->lambda = 1.0;
-    model->layer_size = (int*)malloc((model->nLayers+1)*sizeof(int));
-    model->layer_size[0] = 784;
-    model->layer_size[1] = 400;
-    model->layer_size[2] = 10;
-    model->weights = (float**)malloc((model->nLayers)*sizeof(float*));
-    model->biases = (float**)malloc((model->nLayers)*sizeof(float*));
-    model->gradients = (float**)malloc((model->nLayers)*sizeof(float*));
-    model->grad_biases =(float**)malloc((model->nLayers)*sizeof(float*));
-
-    for(int i = 1; i < model->nLayers+1; i++) {
-        model->weights[i-1] = initializeFlatRandomArray(model->layer_size[i-1], model->layer_size[i]);
-        model->biases[i-1] = initializeFlatRandomArray(1, model->layer_size[i]);
-        model->grad_biases[i-1] = (float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i]);
-        model->gradients[i-1] =(float*)malloc(nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]);
+    int * layer_size = new int[3]{784,16,10};
+    NeuralNetwork model(2, layer_size);
+    model.nClasses = numClasses;
+    model.nLayers = 2;
+    model.weights = (float**)malloc((model.nLayers)*sizeof(float*));
+    model.biases = (float**)malloc((model.nLayers)*sizeof(float*));
+    for(int i = 1; i < model.nLayers+1; i++) {
+        model.weights[i-1] = initializeFlatRandomArray(model.layer_size[i-1], model.layer_size[i]);
+        model.biases[i-1] = initializeFlatRandomArray(1, model.layer_size[i]);
     }
+    model.setupGPU(nThreadsPerWorker*nWorkers);
+    std::shared_ptr<float> d_input = transferMatrixToDevice(input.data(), BATCH_SIZE, model.layer_size[0]);
+    model.forward_pass(d_input, 2, BATCH_SIZE, nWorkers, nThreadsPerWorker);
+    
     //pass training function
     //the train function takes all of the HOST variables and passes them to the GPU before running the training algorithm
     /*

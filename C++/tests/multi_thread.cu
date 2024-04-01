@@ -728,6 +728,52 @@ TEST(ForwardPass, NNForwardPass_Ex2) {
   }
 }
 
+TEST(ForwardPass, NNForwardPass_Ex1_1) {
+  float correctOutput[3] = {0.601807f, 0.58078581f, 1.0f};
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 1;
+  int nLayers = 2;
+  float input[2] = {0.13000f, 0.42f};
+  int *layers = new int[nLayers+1]{1, 2, 1};
+  float **weights = new float*[2];
+  weights[0] = new float[2]{0.1f, 0.2f};
+  weights[1] = new float[2]{0.5f, 0.6f};
+  float **biases = new float*[2];
+  biases[0] = new float[2]{0.4f, 0.3f};
+  biases[1] = new float[1]{0.7f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nThreadsPerWorker*nWorkers);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 0; j < 3; j++) {
+    EXPECT_FLOAT_EQ(activations.get()[j], correctOutput[j]);
+  }
+}
+
+TEST(ForwardPass, NNForwardPass_Ex1_2) {
+  float correctOutput[3] = {0.60873549f, 0.59483749f, 1.0f};
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 1;
+  int nLayers = 2;
+  float input[2] = {0.42f};
+  int *layers = new int[nLayers+1]{1, 2, 1};
+  float **weights = new float*[2];
+  weights[0] = new float[2]{0.1f, 0.2f};
+  weights[1] = new float[2]{0.5f, 0.6f};
+  float **biases = new float*[2];
+  biases[0] = new float[2]{0.4f, 0.3f};
+  biases[1] = new float[1]{0.7f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nThreadsPerWorker*nWorkers);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 1);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 0; j < 3; j++) {
+    EXPECT_FLOAT_EQ(activations.get()[j], correctOutput[j]);
+  }
+}
+
 TEST(CalculateDeltas, NNCalculateDeltasLayer1_Ex1) {
   float ys[2] = {0.9f, 0.23f};
   float correctDeltas[2] = {0.1f, 0.77f};
@@ -967,7 +1013,7 @@ TEST(CalculateDeltas, NNCalculateDeltasLayer0_Ex2) {
   biases[2] = new float[2]{0.04f, 0.17f};
   float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
   float ys[4] = {0.75f, 0.98f, 0.75f, 0.28f};
-  float correctDeltas[8] = {-0.08145683f, -0.07049757f, -0.09399404f, -0.07963723f,-0.00989967f, 0.0016364987f,-0.01784403f, -0.0111072};
+  float correctDeltas[8] = {-0.08145683f, -0.07049757f, -0.09399404f, -0.07963723f,-0.00989967f, 0.0016364987f,-0.01784403f, -0.0111072f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
   model.setupGPU(nThreadsPerWorker*nWorkers);
 
@@ -1035,6 +1081,77 @@ TEST(CalculateDeltas, NNExample1) {
 }
 
 TEST(CalculateDeltas, NNExample2) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float ** weights = new float*[3];
+  weights[0] = new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[1] = new float[12]{0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  weights[2] = new float[6]{0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  float ** biases = new float*[3];
+  biases[0] = new float[4]{0.42f, 0.72f, 0.01f, 0.3f};
+  biases[1] = new float[3]{0.21f, 0.87f, 0.03f};
+  biases[2] = new float[2]{0.04f, 0.17f};
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float ys[4] = {0.75f, 0.98f, 0.75f, 0.28f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nThreadsPerWorker*nWorkers);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 2);
+  std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 2, 2);
+  model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  model.setupDeltas(batch_size);
+  model.backprop(batch_size, d_input, d_y);
+  float **deltas = new float*[model.nLayers];
+  float **correctDeltas = new float*[model.nLayers];
+  correctDeltas[2] = new float[4]{-0.2649302f ,-0.4650698f, -0.2658681f, 0.2358681f};
+  correctDeltas[1] = new float[6]{-0.03025601f, -0.05286462f, -0.06961101f,-0.02497924f,0.011581795f,0.0035215414f};
+  correctDeltas[0] = new float[8]{-0.01781237f, -0.01308189f, -0.022767831f, -0.01654095f,-0.0022952568f,0.00034821813f,-0.0044266f,-0.00253811f};
+  for(int i = 0; i < model.nLayers; i++) {
+    deltas[i] = new float[batch_size*model.layer_size[i+1]];
+    cudaMemcpy(deltas[i], model.deltas[i], batch_size*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int j = 0; j < batch_size*model.layer_size[i+1]; j++) {
+      EXPECT_FLOAT_EQ(correctDeltas[i][j], deltas[i][j]);
+    }
+  }
+}
+
+TEST(ComputeGradients, NNExample1Gradient) {
+  int nWorkers = 2;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 2;
+  float input[2] = {0.13000f, 0.42f};
+  float ys[2] = {0.9f, 0.23f};
+  int *layers = new int[nLayers+1]{1, 2, 1};
+  float **weights = new float*[2];
+  weights[0] = new float[2]{0.1f, 0.2f};
+  weights[1] = new float[2]{0.5f, 0.6f};
+  float **biases = new float*[2];
+  biases[0] = new float[2]{0.4f, 0.3f};
+  biases[1] = new float[1]{0.7f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nThreadsPerWorker*nWorkers);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
+  std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 1, 2);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  model.setupDeltas(batch_size);
+  model.backprop(batch_size, d_input, d_y);
+  float **expected_grads = new float*[model.nLayers];
+  expected_grads[1] = new float[model.layer_size[1]*model.layer_size[2]]{0.52890703f, 0.51610345f};
+  expected_grads[0] = new float[model.layer_size[0]*model.layer_size[1]]{0.04007078f, 0.04866387f};
+  float **gradients = new float*[model.nLayers];
+  for(int i = 0; i < model.nLayers; i++) {
+    gradients[i] = new float[model.layer_size[i]*model.layer_size[i+1]];
+    cudaMemcpy(gradients[i], model.gradients[i], model.layer_size[i]*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int j = 0; j < model.layer_size[i]*model.layer_size[i+1]; j++) {
+      EXPECT_FLOAT_EQ(expected_grads[i][j], gradients[i][j]);
+    }
+  }
+}
+
+TEST(ComputeGradients, NNExample2Gradient) {
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
   int batch_size = 2;

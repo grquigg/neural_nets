@@ -97,6 +97,17 @@ __global__ void dotProductTransposeSegmented(float* inputs, float* weights, floa
         int index_y = threadIdx.x;
         printf("Batch size x %d Batch size y %d\n", batch_size_x, batch_size_y);
         printf("Index x %d, Index y %d\n", index_x, index_y);
+        for(int i = 0; i < vector_h; i++) {
+            for(int j = 0; j < vector_w; j++) {
+                printf("matrix 1 at %d, %d: %f\n", i, j, inputs[i*vector_w+j]);
+            }
+        }
+
+        for(int i = 0; i < weight_h; i++) {
+            for(int j = 0; j < weight_w; j++) {
+                printf("matrix 2 at %d, %d: %f\n", i, j, weights[i*weight_w+j]);
+            }
+        }
         //index_x*batch_size_x indicates the starting row of the input matrix
         //index_x*batch_size_x*weight_x indicates the starting row of the product matrix
         //index_y*batch_size_y indicates the starting column of the weight matrix
@@ -500,8 +511,6 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
 }
 
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias) {
-    printf("Successful call\n");
-    printf("Input start %f %f\n", inputs[0], product[0]);
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     //we subdivide vector_h in "mini-batches" of size batch_size
     //we need to check that (blockDim.x * gridDim.x) is divisible by vector_h
@@ -525,6 +534,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     }
     int size_x = batch_size / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
+    printf("Size_x: %d\nSize_y: %d\n", size_x, size_y);
     // printf("Start for %d %d %d\n", index, index*batch_size*vector_w, index*batch_size*weight_w);
     float* out = product+(index*batch_size*weight_w)+(size_x*index_x*weight_w)+(size_y*index_y); 
     float* input = inputs+(index*batch_size*vector_w)+((size_x*index_x*vector_w));
