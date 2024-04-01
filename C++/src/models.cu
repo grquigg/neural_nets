@@ -87,12 +87,28 @@ void NeuralNetwork::setupGPU(int nThreads) {
     std::cout << "Successful pass" << std::endl;
 }
 void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std::shared_ptr<float> outputs) {
+//       matrixSubtract<<<this->layer_size[this->nLayers],batch_size>>>(this->activations+this->offsets[this->nLayers-1], d_y.get(), batch_size, this->layer_size[this->nLayers], batch_size, this->layer_size[this->nLayers], d_deltas);
+//   float* d_deltas0;
+//   cudaMalloc(&d_deltas0, batch_size*this->layer_size[this->nLayers-1]*sizeof(float));
+//   std::cout << batch_size << " " << this->layer_size[this->nLayers-1] << std::endl;
+//   //there's ambiguity in the dotProductTransposeSegmented
+//   dotProductTransposeSegmented<<<batch_size,this->nLayers-1>>>(d_deltas, this->d_weights[this->nLayers-1], d_deltas0, batch_size, this->layer_size[this->nLayers], this->layer_size[this->nLayers-1], this->layer_size[this->nLayers], false);
     matrixSubtract<<<batch_size,this->layer_size[this->nLayers]>>>(this->activations+this->offsets[this->nLayers-1], outputs.get(), batch_size, this->layer_size[this->nLayers], batch_size, this->layer_size[this->nLayers], this->deltas[this->nLayers-1]);
-    for(int i = this->nLayers - 1; i > 0; i--) {
-        dotProductTransposeSegmented<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], this->d_weights[i], this->activations+this->offsets[i], batch_size, this->layer_size[i], this->layer_size[i-1], this->layer_size[i], false);
+    cudaDeviceSynchronize();
+    for(int i = this->nLayers-1; i > 0; i--) {
+        dotProductTransposeSegmented<<<batch_size, this->layer_size[i]>>>(this->deltas[i], this->d_weights[i], this->deltas[i-1], batch_size, this->layer_size[i+1], this->layer_size[i], this->layer_size[i+1], false);
         cudaDeviceSynchronize();
-
+        sigmoidD<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
+        cudaDeviceSynchronize();
     }
+    // for(int i = this->nLayers - 1; i > 0; i--) {
+    //     std::cout << "Layer " << i << std::endl;
+    //     dotProductTransposeSegmented<<<batch_size, this->layer_size[i-1]>>>(this->deltas[i], this->d_weights[i], this->deltas[i-1], batch_size, this->layer_size[i], this->layer_size[i-1], this->layer_size[i], false);
+    //     cudaDeviceSynchronize();
+    //     // sigmoidD<<<batch_size, this->layer_size[i-1]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
+    //     // cudaDeviceSynchronize();
+    // }
+    std::cout << "Made it to the end" << std::endl;
 }
 
 std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) {

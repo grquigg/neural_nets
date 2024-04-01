@@ -994,7 +994,9 @@ TEST(CalculateDeltas, NNCalculateDeltasLayer0_Ex2) {
   }
 }
 
-TEST(CalculateDeltas, NNExample1) {
+TEST(CalculateDeltas, NNExample1) { 
+  /*this is mostly just to test that the backprop code 
+  implemented works the way that we expect it to */
   int nWorkers = 2;
   int nThreadsPerWorker = 1;
   int batch_size = 2;
@@ -1015,7 +1017,56 @@ TEST(CalculateDeltas, NNExample1) {
   std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
   model.setupDeltas(batch_size);
   model.backprop(batch_size, d_input, d_y);
-  // for(int j = 0; j < 6; j++) {
-  //   EXPECT_FLOAT_EQ(activations.get()[j], correctOutput[j]);
-  // }
+  float **deltas = new float*[model.nLayers];
+  for(int i = 0; i < model.nLayers; i++) {
+    std::cout << "Batch: " << batch_size*model.layer_size[i+1] << std::endl;
+    deltas[i] = new float[batch_size*model.layer_size[i+1]];
+    cudaMemcpy(deltas[i], model.deltas[i], batch_size*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+  }
+  std::cout << "Here" << std::endl;
+  float correctDeltas1[2] = {0.1f, 0.77f};
+  float correctDeltas0[4] = {0.011981769f, 0.01460842f, 0.09169799f, 0.1113447f};
+  for(int j = 0; j < 2; j++) {
+    EXPECT_FLOAT_EQ(deltas[model.nLayers-1][j], correctDeltas1[j]);
+  }
+  for(int j = 0; j < 4; j++) {
+    EXPECT_FLOAT_EQ(correctDeltas0[j], deltas[0][j]);
+  }
+}
+
+TEST(CalculateDeltas, NNExample2) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float ** weights = new float*[3];
+  weights[0] = new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[1] = new float[12]{0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  weights[2] = new float[6]{0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  float ** biases = new float*[3];
+  biases[0] = new float[4]{0.42f, 0.72f, 0.01f, 0.3f};
+  biases[1] = new float[3]{0.21f, 0.87f, 0.03f};
+  biases[2] = new float[2]{0.04f, 0.17f};
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float ys[4] = {0.75f, 0.98f, 0.75f, 0.28f};
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nThreadsPerWorker*nWorkers);
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 2);
+  std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 2, 2);
+  model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  model.setupDeltas(batch_size);
+  model.backprop(batch_size, d_input, d_y);
+  float **deltas = new float*[model.nLayers];
+  float **correctDeltas = new float*[model.nLayers];
+  correctDeltas[2] = new float[4]{-0.2649302f ,-0.4650698f, -0.2658681f, 0.2358681f};
+  correctDeltas[1] = new float[6]{-0.03025601f, -0.05286462f, -0.06961101f,-0.02497924f,0.011581795f,0.0035215414f};
+  correctDeltas[0] = new float[8]{-0.01781237f, -0.01308189f, -0.022767831f, -0.01654095f,-0.0022952568f,0.00034821813f,-0.0044266f,-0.00253811f};
+  for(int i = 0; i < model.nLayers; i++) {
+    deltas[i] = new float[batch_size*model.layer_size[i+1]];
+    cudaMemcpy(deltas[i], model.deltas[i], batch_size*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int j = 0; j < batch_size*model.layer_size[i+1]; j++) {
+      EXPECT_FLOAT_EQ(correctDeltas[i][j], deltas[i][j]);
+    }
+  }
 }

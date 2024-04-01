@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     11. number of desired workers
     12. number of threads per worker
     */
-    train(model, input.data(), outputs, test_input.data(), test_outputs, nEpochs, BATCH_SIZE, size, test_size, learning_rate, nWorkers, nThreadsPerWorker, true);
-    free(model);
+    // train(model, input.data(), outputs, test_input.data(), test_outputs, nEpochs, BATCH_SIZE, size, test_size, learning_rate, nWorkers, nThreadsPerWorker, true);
+    // free(model);
     return 0;
 }
