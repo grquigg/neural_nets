@@ -42,6 +42,8 @@ class NeuralNetwork {
         float * activations;
         float ** deltas;
         int * offsets;
+        std::vector<dim3> forward_pass_specs;
+        std::vector<dim3> backward_pass_specs;
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);
@@ -53,7 +55,7 @@ class NeuralNetwork {
 
         std::shared_ptr<float> forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) ;
 
-        void setupGPU(int nWorkers);
+        void setupGPU(int nWorkers, int batch_size);
 
         void backprop(int batch_size, std::shared_ptr<float> inputs, std::shared_ptr<float> outputs);
 };

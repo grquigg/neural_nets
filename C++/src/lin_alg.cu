@@ -534,7 +534,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     }
     int size_x = batch_size / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
-    printf("Size_x: %d\nSize_y: %d\n", size_x, size_y);
+    printf("Size_x: %d\nSize_y: %d\n Index x %d Index y %d\n", size_x, size_y, index_x, index_y);
     // printf("Start for %d %d %d\n", index, index*batch_size*vector_w, index*batch_size*weight_w);
     float* out = product+(index*batch_size*weight_w)+(size_x*index_x*weight_w)+(size_y*index_y); 
     float* input = inputs+(index*batch_size*vector_w)+((size_x*index_x*vector_w));

@@ -68,15 +68,9 @@ int main(int argc, char** argv) {
     //NEURAL NETWORK
     int * layer_size = new int[3]{784,16,10};
     NeuralNetwork model(2, layer_size);
-    model.nClasses = numClasses;
-    model.nLayers = 2;
-    model.weights = (float**)malloc((model.nLayers)*sizeof(float*));
-    model.biases = (float**)malloc((model.nLayers)*sizeof(float*));
-    for(int i = 1; i < model.nLayers+1; i++) {
-        model.weights[i-1] = initializeFlatRandomArray(model.layer_size[i-1], model.layer_size[i]);
-        model.biases[i-1] = initializeFlatRandomArray(1, model.layer_size[i]);
-    }
-    model.setupGPU(nThreadsPerWorker*nWorkers);
+
+
+    model.setupGPU(nThreadsPerWorker*nWorkers, BATCH_SIZE);
     std::shared_ptr<float> d_input = transferMatrixToDevice(input.data(), BATCH_SIZE, model.layer_size[0]);
     model.forward_pass(d_input, 2, BATCH_SIZE, nWorkers, nThreadsPerWorker);
     

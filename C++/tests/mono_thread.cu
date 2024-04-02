@@ -13,7 +13,7 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the 
   float **weights = new float*[1]{new float[2]{0.1f, 0.2f}};
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
-  model.setupGPU(1);
+  model.setupGPU(1, batch_size);
   float *input = new float[2]{0.13f, 0.42f};
 
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, batch_size, 1);
@@ -47,7 +47,7 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx2) { //REMEMBER THAT WE'RE T
   float **weights = new float*[1]{new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f}};
   float **biases = new float*[1]{new float[4]{0.42f, 0.72f, 0.01f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
-  model.setupGPU(nThreadsPerWorker*nWorkers);
+  model.setupGPU(nThreadsPerWorker*nWorkers, batch_size);
   float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
   std::shared_ptr<float> d_weights = transferMatrixToDevice(model.d_weights[0], model.layer_size[0], model.layer_size[1]);
   std::shared_ptr<float> d_inputs = transferMatrixToDevice(input, 2, 2);
@@ -80,7 +80,7 @@ TEST(SegmentedSigmoid, SingleThreadedEx1) {
   float **weights = new float*[1]{new float[2]{0.1f, 0.2f}};
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
-  model.setupGPU(nThreadsPerWorker*nWorkers);
+  model.setupGPU(nThreadsPerWorker*nWorkers, batch_size);
   float input[2] = {0.13f, 0.42f};
   std::shared_ptr<float> d_weights = transferMatrixToDevice(weights[0], model.layer_size[0], model.layer_size[1]);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
@@ -115,7 +115,7 @@ TEST(SegmentedSigmoid, SingleThreadedEx2) {
   float **weights = new float*[1]{new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f}};
   float **biases = new float*[1]{new float[4]{0.42f, 0.72f, 0.01f, 0.3f}};
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
-  model.setupGPU(nThreadsPerWorker*nWorkers);
+  model.setupGPU(nThreadsPerWorker*nWorkers, batch_size);
   float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
   float *d_product;
   std::shared_ptr<float> d_weights = transferMatrixToDevice(weights[0], model.layer_size[0], model.layer_size[1]);
@@ -155,7 +155,7 @@ TEST(ForwardPass, SingleThreadedDotProduct2Ex1_BATCH_SIZE_1) {
   biases[0] = new float[2]{0.4f, 0.3f};
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
-  model.setupGPU(nWorkers*nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 2);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
@@ -214,7 +214,7 @@ TEST(ForwardPass, SingleThreadedDotProduct2Ex1_BATCH_SIZE_2) {
   biases[0] = new float[2]{0.4f, 0.3f};
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
-  model.setupGPU(nWorkers*nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 2);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
@@ -272,7 +272,7 @@ TEST(ForwardPass, SingleThreadedSoftmaxEx1_BATCH_SIZE_1) {
   biases[0] = new float[2]{0.4f, 0.3f};
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
-  model.setupGPU(nWorkers*nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, model.layer_size[0]);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
@@ -330,7 +330,7 @@ TEST(ForwardPass, SingleThreadedSoftmaxEx1_BATCH_SIZE_2) {
   biases[0] = new float[2]{0.4f, 0.3f};
   biases[1] = new float[1]{0.7f};
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
-  model.setupGPU(nWorkers*nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, model.layer_size[0]);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
@@ -397,7 +397,7 @@ TEST(ForwardPass, SingleThreadedForwardPassEx2_BATCH_SIZE_1) {
     0.4841319f, 0.51586807f
   };
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
-  model.setupGPU(nWorkers*nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, model.layer_size[0]);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
@@ -476,7 +476,7 @@ TEST(ForwardPass, SingleThreadedForwardPassEx2_BATCH_SIZE_2) {
     0.4841319f, 0.51586807f
   };
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
-  model.setupGPU(nWorkers*nThreadsPerWorker);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, model.layer_size[0]);
   int activations_size = 0;
   int * offsets = new int[model.nLayers];
