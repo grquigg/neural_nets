@@ -61,7 +61,6 @@ We still need the on_device flag because there is a possibility that for some
 instances we don't actually cast the model to GPU at all. 
 */
 NeuralNetwork::~NeuralNetwork() {
-    std::cout << "Problem" << std::endl;
     if(this->on_device) {
         for(int i = 0; i < nLayers; i++) {
             cudaFree(this->d_weights[i]);
