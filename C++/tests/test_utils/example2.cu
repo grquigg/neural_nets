@@ -9,8 +9,7 @@ of the same network without having to explicitly instantiate it every single tim
 
 void Example2Suite::SetUp() {
     weights = new float*[nLayers];
-    correctForward = new float*[nLayers];
-    correctForward[0] = new float[8]{0.74f, 1.1192f, 0.3564f, 0.8744f, 0.55250f, 0.81380f, 0.17610f, 0.60410f};
+    correctForward = new float[8]{0.74f, 1.1192f, 0.3564f, 0.8744f, 0.55250f, 0.81380f, 0.17610f, 0.60410f};
     input = new float[4]{0.32f, 0.68f, 0.83f, 0.02f};
     weights[0] = new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
     weights[1] = new float[12]{0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
@@ -24,4 +23,5 @@ void Example2Suite::SetUp() {
 
 void Example2Suite::TearDown() {
     delete model;
+    cudaFree(d_inputs);
 }

@@ -42,8 +42,11 @@ class NeuralNetwork {
         float * activations;
         float ** deltas;
         int * offsets;
-        std::vector<dim3> forward_pass_specs;
-        std::vector<dim3> backward_pass_specs;
+        //specifications for the number of threads per kernel in the forward pass function
+        //the defaults should be (1,1,1)
+        std::vector<dim3> *forward_pass_blockDim;
+        std::vector<dim3> *forward_pass_gridDim;
+        std::vector<dim3> *backward_pass_specs;
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);
@@ -53,7 +56,7 @@ class NeuralNetwork {
 
         void setupDeltas(int batch_size);
 
-        std::shared_ptr<float> forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) ;
+        std::shared_ptr<float> forward_pass(float* d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) ;
 
         void setupGPU(int nWorkers, int batch_size);
 

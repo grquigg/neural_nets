@@ -71,8 +71,8 @@ int main(int argc, char** argv) {
 
 
     model.setupGPU(nThreadsPerWorker*nWorkers, BATCH_SIZE);
-    std::shared_ptr<float> d_input = transferMatrixToDevice(input.data(), BATCH_SIZE, model.layer_size[0]);
-    model.forward_pass(d_input, 2, BATCH_SIZE, nWorkers, nThreadsPerWorker);
+    // std::shared_ptr<float> d_input = transferMatrixToDevice(input.data(), BATCH_SIZE, model.layer_size[0]);
+    // model.forward_pass(d_input, 2, BATCH_SIZE, nWorkers, nThreadsPerWorker);
     
     //pass training function
     //the train function takes all of the HOST variables and passes them to the GPU before running the training algorithm

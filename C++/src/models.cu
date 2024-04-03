@@ -49,6 +49,8 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
     this->layer_size = layer_size;
     this->weights = new float*[this->nLayers];
     this->biases = new float*[this->nLayers];
+    this->forward_pass_blockDim = new std::vector<dim3>(this->nLayers, dim3(1,1,1));
+    this->forward_pass_gridDim = new std::vector<dim3>(this->nLayers, dim3(1,1,1));
     for(int i = 1; i < this->nLayers+1; i++) {
         this->weights[i-1] = initializeFlatRandomArray(this->layer_size[i-1], this->layer_size[i]);
         this->biases[i-1] = initializeFlatRandomArray(1, this->layer_size[i]);
@@ -69,10 +71,6 @@ NeuralNetwork::~NeuralNetwork() {
             cudaFree(this->gradients[i]);
             cudaFree(this->deltas[i]);
         }
-        // if(this->activations != nullptr) {
-        //     std::cout << "Problem here" << std::endl;
-        //     cudaFree(this->activations);
-        // }
     }
     // for(int i = 0; i < nLayers; i++) {
 
@@ -88,6 +86,8 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
     this->biases = biases;
     this->lambda = lambda;
     this->activations = nullptr;
+    this->forward_pass_blockDim = new std::vector<dim3>(this->nLayers, dim3(1,1,1));
+    this->forward_pass_gridDim = new std::vector<dim3>(this->nLayers, dim3(1,1,1));
 }
 
 void NeuralNetwork::setupDeltas(int batch_size) {
@@ -134,41 +134,42 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
     std::cout << "Finished training" << std::endl;
 }
 
-std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) {
+std::shared_ptr<float> NeuralNetwork::forward_pass(float* d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) {
     dim3 nBlocks(nWorkers, 1, 1);
     dim3 nThreads(nThreadsPerWorkers, 1, 1);
     int activations_size = 0;
     this->offsets = new int[this->nLayers];
     for(int i = 1; i <= this->nLayers; i++) {
-        this->offsets[i-1] = (batch_size * activations_size);
+        this->offsets[i-1] = (total_size * activations_size);
         activations_size += this->layer_size[i];
     }
     std::shared_ptr<int> d_offsets = transferMatrixToDevice(this->offsets, this->nLayers, 1);
     float * d_activations;
-    cudaMalloc(&d_activations, batch_size*activations_size*sizeof(float));
-    // for(int i = 0; i < total_size; i+=batch_size) {
-    std::cout << "Layer 0" << std::endl;
-    dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get(), this->d_weights[0], d_activations, batch_size, this->layer_size[0], this->layer_size[0], this->layer_size[1], this->d_biases[0]);
-    cudaDeviceSynchronize();
-    sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations, batch_size*this->layer_size[1]);
-    cudaDeviceSynchronize();
-    int j = 1;
-    for(j = 1; j < this->nLayers-1; j++) {
+    cudaMalloc(&d_activations, total_size*activations_size*sizeof(float));
+    for(int i = 0; i < total_size; i += batch_size) {
+        std::cout << "Layer 0" << std::endl;
+        dotProductSegmented<<<1,1>>>(d_input+(batch_size*i*this->layer_size[0]), this->d_weights[0], d_activations+(batch_size*i*this->layer_size[1]), batch_size, this->layer_size[0], this->layer_size[0], this->layer_size[1], this->d_biases[0]);
+        cudaDeviceSynchronize();
+        sigmoidSegmented<<<1,1>>>(d_activations+(i*batch_size*this->layer_size[1]), batch_size*this->layer_size[1]);
+        cudaDeviceSynchronize();
+        int j = 1;
+        for(j = 1; j < this->nLayers-1; j++) {
+            std::cout << "Layer " << j << std::endl;
+            nThreads.y = this->layer_size[j+1];
+            dotProductSegmented<<<1,1>>>(d_activations+this->offsets[j-1]+(i*batch_size*this->layer_size[j]), this->d_weights[j], d_activations+this->offsets[j]+(i*batch_size*this->layer_size[j+1]), batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
+            cudaDeviceSynchronize();
+            sigmoidSegmented<<<1,1>>>(d_activations+this->offsets[j]+(i*batch_size*this->layer_size[j+1]), batch_size*this->layer_size[j+1]);
+            cudaDeviceSynchronize();
+        }
         std::cout << "Layer " << j << std::endl;
         nThreads.y = this->layer_size[j+1];
-        dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
+        dotProductSegmented<<<1,1>>>(d_activations+this->offsets[j-1]+(i*batch_size*this->layer_size[j]), this->d_weights[j], d_activations+this->offsets[j]+(i*batch_size*this->layer_size[j+1]), batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
         cudaDeviceSynchronize();
-        sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+this->offsets[j], batch_size*this->layer_size[j+1]);
+        softmaxSegmented<<<1,1>>>(d_activations+(this->offsets[j])+(i*batch_size*this->layer_size[j+1]), batch_size, this->layer_size[j+1]);
         cudaDeviceSynchronize();
     }
-    std::cout << "Layer " << j << std::endl;
-    nThreads.y = this->layer_size[j+1];
-    dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
-    cudaDeviceSynchronize();
-    softmaxSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+(this->offsets[j]), batch_size, this->layer_size[j+1]);
-    cudaDeviceSynchronize();
-    float * activations = new float[activations_size*batch_size];
-    cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+    float * activations = new float[activations_size*total_size];
+    cudaMemcpy(activations, d_activations, activations_size*total_size*sizeof(float), cudaMemcpyDeviceToHost);
     this->activations = d_activations;
     return std::shared_ptr<float>(activations);
 }
@@ -179,29 +180,29 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
 //     float *d_inputs;
 //     //copy weights
 //     cudaError_t error;
-//     error = cudaMalloc(&d_inputs, total_size*(model->layer_size[0])*sizeof(float));
+//     error = cudaMalloc(&d_inputs, total_size*(this->layer_size[0])*sizeof(float));
 //     if(error != cudaSuccess) {
 //         std::cout << "Problem with copying" << std::endl;
 //     }
-//     error = cudaMemcpy(d_inputs, train_input, total_size*(model->layer_size[0])*sizeof(float), cudaMemcpyHostToDevice);
+//     error = cudaMemcpy(d_inputs, train_input, total_size*(this->layer_size[0])*sizeof(float), cudaMemcpyHostToDevice);
 //     if(error != cudaSuccess) {
 //         std::cout << "Problem" << std::endl;
 //     }
 //     //copy test data
 //     float *d_test_inputs;
-//     cudaMalloc(&d_test_inputs, test_size*(model->layer_size[0])*sizeof(float));
-//     cudaMemcpy(d_test_inputs, test_input, test_size*(model->layer_size[0])*sizeof(float), cudaMemcpyHostToDevice);
+//     cudaMalloc(&d_test_inputs, test_size*(this->layer_size[0])*sizeof(float));
+//     cudaMemcpy(d_test_inputs, test_input, test_size*(this->layer_size[0])*sizeof(float), cudaMemcpyHostToDevice);
 
 //     //convert labels to one hot encoding
-//     float * one_hot = (float *)malloc(sizeof(float) * total_size * model->nClasses);
+//     float * one_hot = (float *)malloc(sizeof(float) * total_size * this->nClasses);
 //     for (int i = 0; i < total_size; i++) {
-//         for(int j = 0; j < model->nClasses; j++) {
-//             one_hot[i*model->nClasses+j] = 0;
+//         for(int j = 0; j < this->nClasses; j++) {
+//             one_hot[i*this->nClasses+j] = 0;
 //         }
-//         one_hot[i*(model->nClasses)+train_labels[i][0]] = 1.0;
+//         one_hot[i*(this->nClasses)+train_labels[i][0]] = 1.0;
 //     }
 //     //pass labels to GPU
-//     std::shared_ptr<float> d_outputs = transferMatrixToDevice(one_hot, total_size, model->nClasses);
+//     std::shared_ptr<float> d_outputs = transferMatrixToDevice(one_hot, total_size, this->nClasses);
 
 //     //initialize array for storing intermediary activation functions on GPU
 //     /*the super nice thing about the parallelized computation of neural networks is 
@@ -215,23 +216,23 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
 //     of memory as well as an integer array to keep track of the offsets of each "block" in memory.
 //     */
 //     int activations_size = 0;
-//     int * offsets = new int[model->nLayers];
-//     for(int i = 1; i <= model->nLayers; i++) {
+//     int * offsets = new int[this->nLayers];
+//     for(int i = 1; i <= this->nLayers; i++) {
 //         offsets[i-1] = (batch_size * activations_size);
 //         // printf("Offset at %d: %d\n", i-1, offsets[i-1]);
-//         activations_size += model->layer_size[i];
+//         activations_size += this->layer_size[i];
 //     }
 //     float * d_activations = new float[batch_size*activations_size];
 //     float * activations = new float[batch_size*activations_size];
 //     //device pointers
 //     int * d_offsets;
 //     cudaMalloc(&d_activations, activations_size*batch_size*sizeof(float));
-//     cudaMalloc(&d_offsets, model->nLayers*sizeof(int));
+//     cudaMalloc(&d_offsets, this->nLayers*sizeof(int));
 //     for(int i = 0; i < activations_size*batch_size; i++) {
 //         activations[i] = 1;
 //     }
 //     cudaMemcpy(d_activations, activations, activations_size*batch_size*sizeof(float), cudaMemcpyHostToDevice);
-//     cudaMemcpy(d_offsets, offsets, model->nLayers*sizeof(int), cudaMemcpyHostToDevice);
+//     cudaMemcpy(d_offsets, offsets, this->nLayers*sizeof(int), cudaMemcpyHostToDevice);
 
 //     //deltas
 //     float * d_deltas = new float[batch_size*activations_size];
@@ -240,8 +241,8 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
 //     // float * d_product = transferMatrixToDevice(activations, batch_size, activations_size);
 //     // //initialize array for storing predictions of test set on host
 //     float* predictions = (float*)malloc(activations_size*batch_size*sizeof(float));
-//     float * test_predictions = (float*)malloc(test_size*model->nClasses*sizeof(float));
-//     std::shared_ptr<float> d_test_product = transferMatrixToDevice(test_predictions, test_size, model->nClasses);
+//     float * test_predictions = (float*)malloc(test_size*this->nClasses*sizeof(float));
+//     std::shared_ptr<float> d_test_product = transferMatrixToDevice(test_predictions, test_size, this->nClasses);
 //     //define metrics
 //     int correct = 0;
 //     double logLoss = 0.0;
@@ -261,18 +262,18 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
 //             We can create a dim3 of size (nWorkers, 2, 1) as the number of blocks passed to our dot product function
 //             And a dim3 of size(nThreadsPerWorker, 2, 1) as the number of threads per block
 //             */
-//             // predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*model->layer_size[0]), d_activations, d_offsets, batch_size);    
+//             // predict<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*this->layer_size[0]), d_activations, d_offsets, batch_size);    
 //             cudaDeviceSynchronize();
 //             // // auto endForward = std::chrono::system_clock::now();
 //             // // std::chrono::duration<double> elapsed_forward = endForward - startForward;
 //             // // std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
 //             // error = cudaMemcpy(predictions, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
-//             // correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
-//             // logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, model->nClasses, j);
+//             // correct += getAccuracy(predictions+offsets[1], train_labels, batch_size, this->nClasses, j);
+//             // logLoss += crossEntropyLoss(predictions+offsets[1], train_labels, batch_size, this->nClasses, j);
 //             // // printf("Accuracy: %f%%\n", correct / (float) (batch_size)* 100);
 //             // // //compute gradients in forward_pass
 //             // // auto startBackward = std::chrono::system_clock::now();
-//             // backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(model->layer_size[0])), d_outputs+(j*(model->nClasses)), d_activations, d_deltas, d_offsets, batch_size, model->nClasses);
+//             // backprop<<<nWorkers, nThreadsPerWorker>>>(d_model, d_inputs+(j*(this->layer_size[0])), d_outputs+(j*(this->nClasses)), d_activations, d_deltas, d_offsets, batch_size, this->nClasses);
 //             // cudaDeviceSynchronize();
 //             // ringReduce<<<nWorkers, nThreadsPerWorker>>>(d_model, nWorkers*nThreadsPerWorker);
 //             // cudaDeviceSynchronize();
@@ -300,14 +301,14 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
 //     auto endTrain = std::chrono::system_clock::now();
 //     std::chrono::duration<double> elapsed_forward = endTrain - startTrain;
 //     std::cout << "Finished forward pass in " << elapsed_forward.count() << " seconds" << std::endl;
-//     for(int i = 1; i < model->nLayers+1; i++) {
-//         cudaFree(d_model->weights[i-1]);
-//         cudaFree(d_model->biases[i-1]);
-//         cudaFree(d_model->gradients[i-1]);
-//         // cudaMemcpy(temp_gradients[i-1], model->gradients[i-1], nThreadsPerWorker*nWorkers*model->layer_size[i-1]*model->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
-//         cudaFree(d_model->grad_biases[i-1]);
+//     for(int i = 1; i < this->nLayers+1; i++) {
+//         cudaFree(d_this->weights[i-1]);
+//         cudaFree(d_this->biases[i-1]);
+//         cudaFree(d_this->gradients[i-1]);
+//         // cudaMemcpy(temp_gradients[i-1], this->gradients[i-1], nThreadsPerWorker*nWorkers*this->layer_size[i-1]*this->layer_size[i]*sizeof(float), cudaMemcpyHostToDevice);
+//         cudaFree(d_this->grad_biases[i-1]);
 //     }
-//     cudaFree(d_model->layer_size);
+//     cudaFree(d_this->layer_size);
 //     cudaFree(d_inputs);
 //     cudaFree(d_test_inputs);
 //     cudaFree(d_activations);
