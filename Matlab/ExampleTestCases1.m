@@ -73,13 +73,21 @@ classdef ExampleTestCases1 < matlab.unittest.TestCase
             testCase.verifyEqual(testCase.activations{2}, expected, "AbsTol", 1e-5);
         end
 
-        function forwardPass(testCase)
+        function forwardPassTestSigmoidFinalLayer(testCase)
+            testCase.model.forward_pass(testCase.inputs);
+            expected = [0.79403; 0.79597];
+            testCase.verifyEqual(testCase.model.activations{2}, expected, "AbsTol", 1e-5);
+        end
+
+        function forwardPassTestSoftmaxFinalLayer(testCase)
+            testCase.model.activation_fn = @utils.softmax;
             testCase.model.forward_pass(testCase.inputs);
             expected = [1.0; 1.0];
             testCase.verifyEqual(testCase.model.activations{2}, expected, "AbsTol", 1e-5);
         end
 
-        function logLoss(testCase)
+        function logLossSoftmax(testCase)
+            testCase.model.activation_fn = @utils.softmax;
             testCase.model.forward_pass(testCase.inputs);
             loss = utils.crossEntropyLoss(testCase.outputs, testCase.model.activations{2});
             testCase.verifyEqual(loss, -2.56394985712845, "AbsTol", 1e-5);

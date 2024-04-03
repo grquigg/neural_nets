@@ -5,6 +5,8 @@ classdef NeuralNetwork < handle
         weights;
         biases;
         activations;
+        activation_fn;
+        deltas;
     end
     methods
         function obj = NeuralNetwork(layer_size, weights, biases)
@@ -13,6 +15,7 @@ classdef NeuralNetwork < handle
             obj.weights = weights;
             obj.biases = biases;
             obj.activations = cell(obj.nLayers,1);
+            obj.activation_fn = @utils.sigmoid;
         end
 
         function obj = forward_pass(obj, inputs)
@@ -23,7 +26,7 @@ classdef NeuralNetwork < handle
                 obj.activations{i+1} = utils.sigmoid(obj.activations{i+1});
             end
             obj.activations{obj.nLayers} = (obj.activations{obj.nLayers-1} * obj.weights{obj.nLayers}') + obj.biases{obj.nLayers};
-            obj.activations{obj.nLayers} = utils.softmax(obj.activations{obj.nLayers});
+            obj.activations{obj.nLayers} = obj.activation_fn(obj.activations{obj.nLayers});
         end
     end
 end
