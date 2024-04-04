@@ -86,11 +86,20 @@ classdef ExampleTestCases1 < matlab.unittest.TestCase
             testCase.verifyEqual(testCase.model.activations{2}, expected, "AbsTol", 1e-5);
         end
 
-        function logLossSoftmax(testCase)
-            testCase.model.activation_fn = @utils.softmax;
+        %test that everything works as expected with a final sigmoid
+        %activation function rather than softmax
+        function testBackpropDeltaSigmoid(testCase)
             testCase.model.forward_pass(testCase.inputs);
-            loss = utils.crossEntropyLoss(testCase.outputs, testCase.model.activations{2});
-            testCase.verifyEqual(loss, -2.56394985712845, "AbsTol", 1e-5);
+            testCase.model.backprop(testCase.inputs, testCase.outputs);
+            %verify that the calculated deltas are correct
+            testCase.verifyEqual(testCase.model.deltas{2}, [-0.10597257;0.56596607], "AbsTol", 1e-6);
+            testCase.verifyEqual(testCase.model.deltas{1}, [-0.01270,-0.01548;0.06740,0.08184], "AbsTol", 1e-5);
+            %gradient matrices must be same size as the weights
+            testCase.verifyEqual(size(testCase.model.gradients{2}), [1,2]);
+            testCase.verifyEqual(size(testCase.model.gradients{1}), [2,1]);
+            %verify that the calculated gradients are correct
+            testCase.verifyEqual(testCase.model.gradients{2}, [0.14037,0.13756], "AbsTol", 1e-5);
+            testCase.verifyEqual(testCase.model.gradients{1}, [0.01333;0.01618], "AbsTol", 1e-5);
         end
     end
 end

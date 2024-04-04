@@ -4,7 +4,7 @@ input_labels_path = "../mnist/train-labels.idx1-ubyte";
 test_data_path = "../mnist/t10k-images.idx3-ubyte";
 test_labels_path = "../mnist/t10k-labels.idx1-ubyte";
 
-results = runtests('ExampleTestCases1.m');
+% results = runtests('ExampleTestCases1.m');
 
 % BATCH_SIZE = 5000;
 % EPOCHS = 10;

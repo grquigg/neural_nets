@@ -90,7 +90,7 @@ classdef ExampleTestCases2 < matlab.unittest.TestCase
         function forwardPassSoftmaxFinal(testCase)
             testCase.model.activation_fn = @utils.softmax;
             testCase.model.forward_pass(testCase.inputs);
-            expected = [0.485,0.5149;0.484,0.5159];
+            expected = [0.4850698,0.5149;0.484,0.5159];
             testCase.verifyEqual(testCase.model.activations{3}, expected, "AbsTol", 1e-3);
         end
 
@@ -105,6 +105,18 @@ classdef ExampleTestCases2 < matlab.unittest.TestCase
             testCase.model.forward_pass(testCase.inputs);
             loss = utils.crossEntropyLoss(testCase.outputs, testCase.model.activations{3});
             testCase.verifyEqual(loss, 1.922427885698340, "AbsTol", 1e-5);
+        end
+
+        function testBackpropDelta(testCase)
+            testCase.model.activation_fn = @utils.softmax;
+            testCase.model.forward_pass(testCase.inputs);
+            testCase.model.backprop(testCase.inputs, testCase.outputs);
+            testCase.verifyEqual(testCase.model.deltas{3}, [-0.2649302,-0.4650698;-0.2658681,0.2358681], "AbsTol", 1e-6);
+            testCase.verifyEqual(testCase.model.deltas{2}, [-0.03025601,-0.05286462,-0.06961101;-0.02497924,0.0115818,0.00352154], "AbsTol", 1e-6);
+            %gradient matrices must be same size as the weights
+            testCase.verifyEqual(size(testCase.model.gradients{3}), size(testCase.model.weights{3}));
+            testCase.verifyEqual(size(testCase.model.gradients{2}), size(testCase.model.weights{2}));
+            testCase.verifyEqual(size(testCase.model.gradients{1}), size(testCase.model.weights{1}));
         end
     end
 end
