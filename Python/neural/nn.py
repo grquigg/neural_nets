@@ -3,12 +3,14 @@ from .utils import softmax, sigmoid
 import math
 
 class NeuralNetwork:
-    def __init__(self, layers, bias=None, weights=None, regularizer=0, learning_rate=0.05):
+    def __init__(self, layers, bias=None, weights=None, regularizer=0, learning_rate=0.05, final_activation=sigmoid):
         self.layers = layers
         self.activations = []
+        self.bias = bias
         self.z = []
         self.regularizer = regularizer
         self.learning_rate = learning_rate
+        self.final_activations = final_activation
         if(weights):
             self.weights = weights
         else: #randomly initialize the weights for each layer
@@ -19,26 +21,27 @@ class NeuralNetwork:
         self.activations = []
         self.z = []
         a = np.array(X)
-        column = np.ones((len(X), 1))
-        a = np.append(column, a, 1)
         if(verbose):
             print("a1: {}\n".format(a[0]))
         self.activations.append(a)
-        for i in range(1, len(self.layers)-1):
-            a = np.dot(a, np.transpose(self.weights[i-1]))
+        i = 1
+        while(i < len(self.layers)-1):
+            a = np.dot(a, self.weights[i-1]) + self.bias[i-1]
             if(verbose):
                 print("z{}: {}".format(i+1, a[0]))
             self.z.append(a)
             a = sigmoid(a)
-            column = np.ones((len(a), 1))
-            a = np.append(column, a, 1)
             if(verbose):
                 print("a{}: {}\n".format(i+1, a[0]))
             self.activations.append(a)
-        a = np.dot(a, np.transpose(self.weights[i]))
+            i += 1
+        print(a)
+        print(self.weights[i-1])
+        a = np.dot(a, self.weights[i-1]) + self.bias[i-1]
         if(verbose):
             print("z{}: {}".format(i+2, a[0]))
-        a = sigmoid(a)
+        a = self.final_activations(a)
+        self.activations.append(a)
         if(verbose):
             print("a{}: {}".format(i+2, a[0]))
         return a
