@@ -35,8 +35,6 @@ class NeuralNetwork:
                 print("a{}: {}\n".format(i+1, a))
             self.activations.append(a)
             i += 1
-        print(a)
-        print(self.weights[i-1])
         a = np.dot(a, self.weights[i-1]) + self.bias[i-1]
         if(verbose):
             print("z{}: {}".format(i+2, a[0]))
@@ -67,6 +65,7 @@ class NeuralNetwork:
 
     def backprop(self, actual, expected, regularize=True):
         self.gradients = []
+        self.grad_biases = []
         #delta value of the last layer
         self.deltas = []
         delta3 = np.array(actual - expected)
@@ -79,20 +78,25 @@ class NeuralNetwork:
             delta2 = np.dot(self.deltas[0], np.transpose(self.weights[i]))
             delta2 = np.multiply(delta2, np.multiply(self.activations[i], (1 - self.activations[i])))
             self.deltas.insert(0, delta2)
-            gradient = np.dot(np.transpose(self.activations[i]),self.deltas[1])
+
+        for i in range(len(self.weights)-1, -1, -1):
+            gradient = np.dot(np.transpose(self.activations[i]),self.deltas[i])
+            grad_bias = np.sum(self.deltas[i], axis=0) / len(actual)
             if(regularize):
                 regularizer = np.multiply(self.regularizer, self.weights[i])
                 mask = np.ones(regularizer.shape)
-                mask[:,0] = 0
                 regularizer = np.multiply(regularizer, mask)
                 #multiply the regularizer matrix by a [[0, 1, 1...]...] matrix to not apply the regularizer to the biases
                 gradient = (gradient + regularizer) / len(actual)
+
+                regularized = np.multiply(self.regularizer, self.bias[i])
+                mask = np.ones(regularized.shape)
+                regularized = np.multiply(regularized, mask)
+                
             else:
                 gradient = gradient / len(actual)
             self.gradients.insert(0, gradient)
-        grads = np.dot(np.transpose(self.activations[0]), self.deltas[0])
-        grads = grads / len(actual)
-        self.gradients.insert(0, grads)
+            self.grad_biases.insert(0, grad_bias)
 
     def update_weights(self):
         for i in range(len(self.weights)):

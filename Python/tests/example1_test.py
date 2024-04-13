@@ -18,7 +18,7 @@ class TestNNExampleOne(unittest.TestCase):
 
     def test_activations_for_ex_one(self):
         correct = [[0.13],[0.60181,0.58079],[0.79403]]
-        self.model.forward_prop(self.x[0], verbose=True)
+        self.model.forward_prop(self.x[0])
         self.assertEqual(self.model.activations[0], correct[0])
         for i in range(1, len(self.model.activations)):
             for j in range(len(self.model.activations[i])):
@@ -26,7 +26,7 @@ class TestNNExampleOne(unittest.TestCase):
 
     def test_activations_for_ex_two(self):
         correct = [[0.42],[0.60874,0.59484],[0.79597]]
-        self.model.forward_prop(self.x[1], verbose=True)
+        self.model.forward_prop(self.x[1])
         self.assertEqual(self.model.activations[0], correct[0])
         for i in range(1, len(self.model.activations)):
             for j in range(len(self.model.activations[i])):
@@ -35,7 +35,6 @@ class TestNNExampleOne(unittest.TestCase):
     def test_final_activation_softmax_for_ex_one(self):
         self.model.final_activations = softmax
         self.model.forward_prop(self.x[0])
-        print(self.model.activations)
         self.assertEqual(self.model.activations[2], 1.0)
 
     def test_final_activation_softmax_for_ex_two(self):
@@ -73,6 +72,8 @@ class TestNNExampleOne(unittest.TestCase):
         self.model.backprop(self.model.activations[-1], self.y, regularize=False)
         self.assertTrue(np.allclose(self.model.gradients[1], [[0.14037],[0.13756]], atol=1e-5))
         self.assertTrue(np.allclose(self.model.gradients[0], [[0.01333, 0.01618]], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.grad_biases[0], [0.02735, 0.03318], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.grad_biases[1], [0.23], atol=1e-5))
 
 if __name__ == "__main__":
     unittest.main()
