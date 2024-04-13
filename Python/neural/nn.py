@@ -22,17 +22,17 @@ class NeuralNetwork:
         self.z = []
         a = np.array(X)
         if(verbose):
-            print("a1: {}\n".format(a[0]))
+            print("a1: {}\n".format(a))
         self.activations.append(a)
         i = 1
         while(i < len(self.layers)-1):
             a = np.dot(a, self.weights[i-1]) + self.bias[i-1]
             if(verbose):
-                print("z{}: {}".format(i+1, a[0]))
+                print("z{}: {}".format(i+1, a))
             self.z.append(a)
             a = sigmoid(a)
             if(verbose):
-                print("a{}: {}\n".format(i+1, a[0]))
+                print("a{}: {}\n".format(i+1, a))
             self.activations.append(a)
             i += 1
         print(a)
@@ -68,17 +68,18 @@ class NeuralNetwork:
     def backprop(self, actual, expected, regularize=True):
         self.gradients = []
         #delta value of the last layer
-        deltas = []
-        delta3 = actual - expected
+        self.deltas = []
+        delta3 = np.array(actual - expected)
         #cost with respect to the weights
-        deltas.append(delta3)
+        #expect delta3 to be of size [batch_size, output_size]
+        
+        self.deltas.append(delta3)
         #add an extra zero column to the 
         for i in range(len(self.weights)-1, 0, -1):
-            delta2 = np.dot(deltas[0], self.weights[i])
+            delta2 = np.dot(self.deltas[0], np.transpose(self.weights[i]))
             delta2 = np.multiply(delta2, np.multiply(self.activations[i], (1 - self.activations[i])))
-            delta2 = np.delete(delta2, 0, axis=1) #delete the first column
-            deltas.insert(0, delta2)
-            gradient = np.dot(np.transpose(deltas[i]), self.activations[i])
+            self.deltas.insert(0, delta2)
+            gradient = np.dot(np.transpose(self.activations[i]),self.deltas[1])
             if(regularize):
                 regularizer = np.multiply(self.regularizer, self.weights[i])
                 mask = np.ones(regularizer.shape)
@@ -89,7 +90,9 @@ class NeuralNetwork:
             else:
                 gradient = gradient / len(actual)
             self.gradients.insert(0, gradient)
-        pass
+        grads = np.dot(np.transpose(self.activations[0]), self.deltas[0])
+        grads = grads / len(actual)
+        self.gradients.insert(0, grads)
 
     def update_weights(self):
         for i in range(len(self.weights)):
