@@ -1,47 +1,44 @@
-from neural.utils import computeAccuracy
+from neural.utils import computeAccuracy, read_file
+from neural.nn import NeuralNetwork
 import numpy as np
 from scipy.special import softmax
 
 if __name__ == "__main__":
-    input_path = "./MNIST_ORG/train-images.idx3-ubyte"
-    output_path = "./MNIST_ORG/train-labels.idx1-ubyte"
-    test_size = 40
-    n_features = 20  # example value
-    out_classes = 5  # example value
-    BATCH_SIZE = 20
-    learning_rate = 0.01
+    input_path = "../mnist/train-images.idx3-ubyte"
+    output_path = "../mnist/train-labels.idx1-ubyte"
+    BATCH_SIZE = 4000
+    FULL_SIZE = 60000
+    regularizer = 0.1
+    learning_rate = 0.0001
     epochs = 100
+    layers = [784, 10]
     # Initialize inputs array with zeros and then set specific indices to 1.0
-    inputs = np.zeros((test_size, n_features), dtype=float)
-    for i in range(test_size):
-        inputs[i, i % n_features] = 1.0
-    print(inputs)
+    inputs = read_file(input_path)
+    inputs = np.reshape(inputs, (60000, 784)).astype(float)
+    inputs /= 255.0
     # Initialize outputs array with zeros and then set specific indices to 1.0
-    outputs = np.zeros((test_size, out_classes), dtype=float)
-    for i in range(test_size):
-        outputs[i, i % out_classes] = 1.0
-    weights = np.zeros((n_features, out_classes), dtype=float)
-    for i in range(n_features):
-        for j in range(out_classes):
-            weights[i, j] = 1/((i*out_classes)+j+1)
-    # print("Weights")
-    # print(weights)
+    outputs = read_file(output_path)
+    output_one_hot = np.zeros((60000, 10))
+    for i in range(len(outputs)):
+        output_one_hot[i][outputs[i]] = 1
+    weights = []
+    biases = []
+    for i in range(len(layers)-1):
+        weights.append(np.ones((layers[i], layers[i+1]))*0.01)
+        biases.append(np.ones((1, layers[i+1]))*0.01)
+
+    model = NeuralNetwork(layers, biases, weights, learning_rate=learning_rate, final_activation=softmax, regularizer=regularizer)
     for epoch in range(epochs):
         accuracy = 0
         numCorrect = 0
         logLoss = 0
-        for i in range(0, test_size, BATCH_SIZE):
-            product = np.dot(inputs[i:i+BATCH_SIZE], weights)
-            predicted = softmax(product, axis=1)
-            numCorrect += computeAccuracy(predicted, outputs[i:i+BATCH_SIZE])
-            # print("Probabilities")
-            # print(predicted)
-            logLoss += np.sum(-np.multiply(np.log(predicted), outputs[i:i+BATCH_SIZE]))
-            grads = predicted - outputs[i:i+BATCH_SIZE]
-            updated = np.dot(inputs[i:i+BATCH_SIZE].T, grads)
-            weights = weights - (updated * learning_rate / BATCH_SIZE)
-            # print("Weights")
-            # print(weights)
-        accuracy = numCorrect / test_size * 100
+        for i in range(0, FULL_SIZE, BATCH_SIZE):
+            model.forward_prop(inputs[i:i+BATCH_SIZE])
+            predicted = model.activations[-1]
+            numCorrect += computeAccuracy(predicted, output_one_hot[i:i+BATCH_SIZE])
+            logLoss += np.sum(-np.multiply(np.log(predicted), output_one_hot[i:i+BATCH_SIZE]))
+            model.backprop(predicted, output_one_hot[i:i+BATCH_SIZE])
+            model.update_weights()
+        accuracy = numCorrect / FULL_SIZE * 100
         print(f"Accuracy {accuracy}%")
         print(f"Log loss {logLoss}")

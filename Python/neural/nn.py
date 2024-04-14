@@ -101,3 +101,4 @@ class NeuralNetwork:
     def update_weights(self):
         for i in range(len(self.weights)):
             self.weights[i] = self.weights[i] - np.multiply(self.learning_rate, self.gradients[i])
+            self.bias[i] = self.bias[i] - np.multiply(self.learning_rate, self.grad_biases[i])

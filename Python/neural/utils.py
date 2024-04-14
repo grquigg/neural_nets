@@ -8,7 +8,7 @@ def sigmoid(x):
 def softmax(x):
     return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
 
-def read_file(path):
+def read_file(path) -> np.ndarray:
     inputs = None
     with open(path, 'rb') as file:
         magic = struct.unpack("4B", file.read(4))
