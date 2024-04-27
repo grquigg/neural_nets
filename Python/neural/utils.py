@@ -2,12 +2,37 @@ import numpy as np
 import struct
 from array import array
 
+def cross_entropy_loss(y_true, y_pred):
+    # Small epsilon to prevent log(0) scenario
+    epsilon = 1e-15
+    y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
+    # Compute the cross entropy for each row (observation)
+    ce_loss = -np.sum(y_true * np.log(y_pred), axis=1)
+    # Average over all observations
+    return np.mean(ce_loss)
+
 def sigmoid(x):
     return 1/(1+np.exp(-x))
+
+def sigmoid_derivative(x):
+    return np.multiply(sigmoid(x), (1 - sigmoid(x)))
 
 def softmax(x):
     return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
 
+def relu(x) -> np.ndarray:
+    return np.maximum(0, x)
+
+def relu_derivative(x) -> np.ndarray:
+    return (x > 0).astype(float)
+
+
+def get_derivative_for_activation_fn(fn):
+    if fn == relu:
+        return relu_derivative
+    elif fn == sigmoid:
+        return sigmoid_derivative
+    
 def read_file(path) -> np.ndarray:
     inputs = None
     with open(path, 'rb') as file:

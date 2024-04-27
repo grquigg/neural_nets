@@ -1,15 +1,16 @@
 import numpy as np
-from .utils import softmax, sigmoid
+from .utils import softmax, sigmoid, relu, get_derivative_for_activation_fn
 import math
 
 class NeuralNetwork:
-    def __init__(self, layers, bias=None, weights=None, regularizer=0, learning_rate=0.05, final_activation=sigmoid):
+    def __init__(self, layers, bias=None, weights=None, regularizer=0, learning_rate=0.05, activation_fn=relu, final_activation=sigmoid):
         self.layers = layers
         self.activations = []
         self.bias = bias
         self.z = []
         self.regularizer = regularizer
         self.learning_rate = learning_rate
+        self.activation_fn = activation_fn
         self.final_activations = final_activation
         if(weights):
             self.weights = weights
@@ -30,7 +31,7 @@ class NeuralNetwork:
             if(verbose):
                 print("z{}: {}".format(i+1, a))
             self.z.append(a)
-            a = sigmoid(a)
+            a = self.activation_fn(a)
             if(verbose):
                 print("a{}: {}\n".format(i+1, a))
             self.activations.append(a)
@@ -38,6 +39,7 @@ class NeuralNetwork:
         a = np.dot(a, self.weights[i-1]) + self.bias[i-1]
         if(verbose):
             print("z{}: {}".format(i+2, a[0]))
+        self.z.append(a)
         a = self.final_activations(a)
         self.activations.append(a)
         if(verbose):
@@ -76,7 +78,7 @@ class NeuralNetwork:
         #add an extra zero column to the 
         for i in range(len(self.weights)-1, 0, -1):
             delta2 = np.dot(self.deltas[0], np.transpose(self.weights[i]))
-            delta2 = np.multiply(delta2, np.multiply(self.activations[i], (1 - self.activations[i])))
+            delta2 = np.multiply(delta2, get_derivative_for_activation_fn(self.activation_fn)(self.z[i-1]))
             self.deltas.insert(0, delta2)
 
         for i in range(len(self.weights)-1, -1, -1):

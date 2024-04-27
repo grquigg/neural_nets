@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from context import NeuralNetwork, softmax
+from context import NeuralNetwork, softmax, sigmoid
 
 class TestNNExampleOne(unittest.TestCase):
     @classmethod
@@ -8,7 +8,7 @@ class TestNNExampleOne(unittest.TestCase):
         cls.layers = [2,4,3,2]
         cls.weights = [np.array([[0.15, 0.1, 0.19, 0.35], [0.4, 0.54, 0.42, 0.68]]),np.array([[0.67, 0.42, 0.56], [0.14, 0.2, 0.8], [0.96, 0.32, 0.69], [0.87, 0.89, 0.09]]), np.array([[0.87, 0.1], [0.42, 0.95], [0.53, 0.69]])]
         cls.bias = [np.array([[0.42, 0.72, 0.01, 0.3]]), np.array([[0.21, 0.87, 0.03]]), np.array([[0.04, 0.17]])]
-        cls.model = NeuralNetwork(cls.layers, bias=cls.bias, weights=cls.weights)
+        cls.model = NeuralNetwork(cls.layers, bias=cls.bias, weights=cls.weights, activation_fn=sigmoid)
         cls.x = [[0.32, 0.68],[0.83, 0.02]]
         cls.y = [[0.75, 0.98], [0.75, 0.28]]
 
