@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from context import NeuralNetwork, softmax
+from context import NeuralNetwork, softmax, sigmoid, relu
 
 class TestNNExampleOne(unittest.TestCase):
     @classmethod
@@ -8,7 +8,7 @@ class TestNNExampleOne(unittest.TestCase):
         cls.layers = [1,2,1]
         cls.bias = [np.array([[0.4, 0.3]]),np.array([[0.7]])]
         cls.weights = [np.array([[0.1, 0.2]]), np.array([[0.5],[0.6]])]
-        cls.model = NeuralNetwork(cls.layers, bias=cls.bias, weights=cls.weights)
+        cls.model = NeuralNetwork(cls.layers, bias=cls.bias, weights=cls.weights, activation_fn=sigmoid)
         cls.x = [[0.13],[0.42]]
         cls.y = [[0.9], [0.23]]
 
@@ -49,6 +49,7 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.activations[2], [[0.79403],[0.79597]]))
 
     def test_deltas_for_ex_one(self):
+        self.model.activation_fn = sigmoid
         self.model.forward_prop(self.x[0])
         self.model.backprop(self.model.activations[-1], self.y[0], regularize=False)
         self.assertTrue(np.allclose(self.model.deltas[1], [[-0.10597]], rtol=1e-4))
@@ -60,6 +61,7 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.gradients[0], [[-0.00165, -0.00201]], atol=1e-3))
 
     def test_deltas_for_ex_two(self):
+        self.model.activation_fn = sigmoid
         self.model.forward_prop(self.x[1])
         self.model.backprop(self.model.activations[-1], self.y[1], regularize=False)
         self.assertTrue(np.allclose(self.model.deltas[1], [[0.56597]]))
@@ -68,12 +70,37 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.gradients[0], [[0.02831, 0.03437]], atol=1e-3))
     
     def test_deltas_for_both(self):
+        self.model.activation_fn = sigmoid
         self.model.forward_prop(self.x)
         self.model.backprop(self.model.activations[-1], self.y, regularize=False)
         self.assertTrue(np.allclose(self.model.gradients[1], [[0.14037],[0.13756]], atol=1e-5))
         self.assertTrue(np.allclose(self.model.gradients[0], [[0.01333, 0.01618]], atol=1e-5))
         self.assertTrue(np.allclose(self.model.grad_biases[0], [0.02735, 0.03318], atol=1e-5))
         self.assertTrue(np.allclose(self.model.grad_biases[1], [0.23], atol=1e-5))
+
+    def test_forward_prop_for_relu_ex_one(self):
+        self.model.final_activations = sigmoid
+        self.model.activation_fn = relu
+        self.model.forward_prop(self.x[0])
+        self.assertTrue(np.allclose(self.model.activations[0], [0.13], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.activations[1], [[0.413, 0.326]], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.activations[2], [[0.75065]], atol=1e-5))
+
+    def test_forward_prop_for_relu_ex_two(self):
+        self.model.final_activations = sigmoid
+        self.model.activation_fn = relu
+        self.model.forward_prop(self.x[1])
+        self.assertTrue(np.allclose(self.model.activations[0], [0.42], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.activations[1], [[0.442, 0.384]], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.activations[2], [[0.75976654]], atol=1e-5))
+
+    def test_backprop_for_relu_ex_one(self):
+        self.model.activation_fn = relu
+        self.model.forward_prop(self.x[0])
+        self.model.backprop(self.model.activations[-1], self.y[0], regularize=False)
+        print(self.model.deltas[0])
+        self.assertTrue(np.allclose(self.model.deltas[1], [[0.75065-0.9]], rtol=1e-4))
+        self.assertTrue(np.allclose(self.model.deltas[0]),[[]])
 
 if __name__ == "__main__":
     unittest.main()
