@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from context import NeuralNetwork, softmax, sigmoid
+from context import NeuralNetwork, softMax, sigmoid
 
 class TestNNExampleOne(unittest.TestCase):
     @classmethod
@@ -28,14 +28,14 @@ class TestNNExampleOne(unittest.TestCase):
         for i in range(len(self.model.activations)):
             self.assertTrue(np.allclose(correct[i], self.model.activations[i], atol=1e-5))
 
-    def test_final_activation_softmax_for_ex_one(self):
-        self.model.final_activations = softmax
+    def test_final_activation_softMax_for_ex_one(self):
+        self.model.final_activations = softMax
         self.model.forward_prop(self.x[0])
         
         self.assertTrue(np.allclose(self.model.activations[-1], [[0.4850698, 0.5149302]]))
 
-    def test_final_activation_softmax_for_ex_two(self):
-        self.model.final_activations = softmax
+    def test_final_activation_softMax_for_ex_two(self):
+        self.model.final_activations = softMax
         self.model.forward_prop(self.x[1])
         self.assertTrue(np.allclose(self.model.activations[-1], [[0.4841319, 0.5158681]]))
 
@@ -86,6 +86,7 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.gradients[0], [[0.02564, 0.01837, 0.03196, 0.05037],[0.04987, 0.06719, 0.05252, 0.08492]], atol=1e-4))
         self.assertTrue(np.allclose(self.model.gradients[1], [[0.09068, 0.06780, 0.08924], [0.02512, 0.04164, 0.12094], [0.12597, 0.05308, 0.10270], [0.11586, 0.12677, 0.03078]], atol=1e-4))
         self.assertTrue(np.allclose(self.model.gradients[2], [[0.17935, 0.19195], [0.12476, 0.30343], [0.13186, 0.25249]], atol=1e-4))
+        self.assertEqual(self.model.grad_biases[0].shape, (4,))
         self.assertTrue(np.allclose(self.model.grad_biases[0], [0.00804, 0.00666, 0.00973, 0.00776], atol=1e-4))
         self.assertTrue(np.allclose(self.model.grad_biases[1], [0.01071, 0.02442, 0.03056], atol=1e-4))
         self.assertTrue(np.allclose(self.model.grad_biases[2], [0.08135, 0.20982], atol=1e-4))

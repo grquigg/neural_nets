@@ -1,6 +1,7 @@
 import numpy as np
 import struct
 from array import array
+from scipy.special import softmax
 
 def cross_entropy_loss(y_true, y_pred):
     # Small epsilon to prevent log(0) scenario
@@ -17,8 +18,8 @@ def sigmoid(x):
 def sigmoid_derivative(x):
     return np.multiply(sigmoid(x), (1 - sigmoid(x)))
 
-def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
+def softMax(x):
+    return softmax(x, axis=1)
 
 def relu(x) -> np.ndarray:
     return np.maximum(0, x)

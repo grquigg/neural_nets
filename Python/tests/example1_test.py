@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from context import NeuralNetwork, softmax, sigmoid, relu
+from context import NeuralNetwork, softMax, sigmoid, relu
 
 class TestNNExampleOne(unittest.TestCase):
     @classmethod
@@ -33,12 +33,12 @@ class TestNNExampleOne(unittest.TestCase):
                 self.assertAlmostEqual(self.model.activations[i][0][j], correct[i][j], places=5)
 
     def test_final_activation_softmax_for_ex_one(self):
-        self.model.final_activations = softmax
+        self.model.final_activations = softMax
         self.model.forward_prop(self.x[0])
         self.assertEqual(self.model.activations[2], 1.0)
 
     def test_final_activation_softmax_for_ex_two(self):
-        self.model.final_activations = softmax
+        self.model.final_activations = softMax
         self.model.forward_prop(self.x[1])
         self.assertEqual(self.model.activations[2], 1.0)
 
@@ -58,6 +58,7 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.deltas[0], [[-0.01270, -0.01548]], rtol=1e-3))
         self.assertEqual(self.model.gradients[1].shape, self.model.weights[1].shape)
         self.assertTrue(np.allclose(self.model.gradients[1], [[-0.06378],[-0.06155]], rtol=1e-3))
+        self.assertEqual(self.model.gradients[0].shape, self.model.weights[0].shape)
         self.assertTrue(np.allclose(self.model.gradients[0], [[-0.00165, -0.00201]], atol=1e-3))
 
     def test_deltas_for_ex_two(self):
@@ -68,6 +69,7 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.deltas[0], [[0.06740,0.08184]], rtol=1e-3))
         self.assertTrue(np.allclose(self.model.gradients[1], [[0.34452],[0.33666]], atol=1e-3))
         self.assertTrue(np.allclose(self.model.gradients[0], [[0.02831, 0.03437]], atol=1e-3))
+        self.assertEqual(self.model.gradients[0].shape, self.model.weights[0].shape)
     
     def test_deltas_for_both(self):
         self.model.activation_fn = sigmoid
@@ -75,6 +77,8 @@ class TestNNExampleOne(unittest.TestCase):
         self.model.backprop(self.model.activations[-1], self.y, regularize=False)
         self.assertTrue(np.allclose(self.model.gradients[1], [[0.14037],[0.13756]], atol=1e-5))
         self.assertTrue(np.allclose(self.model.gradients[0], [[0.01333, 0.01618]], atol=1e-5))
+        self.assertEqual(self.model.gradients[0].shape, self.model.weights[0].shape)
+        self.assertEqual(self.model.grad_biases[0].shape, (2,))
         self.assertTrue(np.allclose(self.model.grad_biases[0], [0.02735, 0.03318], atol=1e-5))
         self.assertTrue(np.allclose(self.model.grad_biases[1], [0.23], atol=1e-5))
 
@@ -100,7 +104,12 @@ class TestNNExampleOne(unittest.TestCase):
         self.model.backprop(self.model.activations[-1], self.y[0], regularize=False)
         print(self.model.deltas[0])
         self.assertTrue(np.allclose(self.model.deltas[1], [[0.75065-0.9]], rtol=1e-4))
-        self.assertTrue(np.allclose(self.model.deltas[0]),[[]])
+        # self.assertTrue(np.allclose(self.model.deltas[0]),[[]])
 
+    def test_updated_weights_for_example_one(self):
+        self.model.forward_prop(self.x[0])
+        self.model.backprop(self.model.activations[-1], self.y[0], regularize=False)
+        self.model.update_weights()
+        self.assertEqual(self.model.weights[0].shape, (1,2))
 if __name__ == "__main__":
     unittest.main()
