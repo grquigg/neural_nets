@@ -48,21 +48,17 @@ class NeuralNetwork:
 
     def cost(self, actual, expected, regularize=True):
         J = 0
-        for i in range(len(actual)):
-            cost = 0
-            for j in range(len(actual[i])):
-                cost += ((-expected[i][j]) * (math.log(actual[i][j])) - ((1 - expected[i][j]) * math.log(1 - actual[i][j])))
-            J += cost
-        pass
-        J = J / len(actual)
+        epsilon = 1e-15
+        y_pred = np.clip(actual, epsilon, 1 - epsilon)
+        # Compute the cross entropy for each row (observation)
+        ce_loss = -np.sum(expected * np.log(actual), axis=1)
+        J += np.mean(ce_loss)
         if(regularize):
-            S = 0
+            L2 = 0
             for i in range(len(self.weights)):
-                for j in range(len(self.weights[i])):
-                    for k in range(1, len(self.weights[i][j])):
-                        S += (self.weights[i][j][k]**2)
-            S = (self.regularizer / (2 * len(actual))) * S
-            J += S
+                L2 += np.sum(self.weights[i] ** 2)
+            L2 = (self.regularizer / (2 * len(actual))) * L2
+            J += L2
         return J
 
     def backprop(self, actual, expected, regularize=True):
