@@ -9,7 +9,7 @@ if __name__ == "__main__":
     BATCH_SIZE = 4000
     FULL_SIZE = 60000
     regularizer = 1
-    learning_rate = 0.001
+    learning_rate = 0.01
     epochs = 1000
     layers = [784, 64, 10]
     # Initialize inputs array with zeros and then set specific indices to 1.0

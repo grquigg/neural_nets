@@ -88,9 +88,9 @@ class NeuralNetwork:
             self.gradients[f'dW{i}'] = gradient
             self.grad_biases[f'db{i}'] = grad_bias
 
-        for i in range(L-1, 0, -1):
+        for i in range(L, 0, -1):
             if(regularize):
-                mask = np.ones(self.weights[i-1].shape) * self.regularizer
+                mask = self.weights[i-1] * self.regularizer
                 self.gradients[f'dW{i}'] += mask
             self.gradients[f'dW{i}'] /= len(actual)
             self.grad_biases[f'db{i}'] /= len(actual)
