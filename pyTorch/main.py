@@ -23,23 +23,27 @@ class SimpleNN(nn.Module):
     def __init__(self):
         super(SimpleNN, self).__init__()
         self.layer1 = nn.Linear(in_features=784, out_features=64)
-        self.layer2 = nn.Linear(in_features=64, out_features=10)
-        # self.layer3 = nn.Linear(64, 10)
+        self.layer2 = nn.Linear(in_features=64, out_features=64)
+        self.layer3 = nn.Linear(in_features=64, out_features=10)
         # Initialize weights and biases to 0.1
-        with torch.no_grad():
-            layer1_weights = torch.from_numpy(np.random.randn(self.layer1.out_features,self.layer1.in_features).astype(np.float32))
-            layer1_bias = torch.from_numpy(np.random.randn(self.layer1.out_features).astype(np.float32))
-            layer2_weights = torch.from_numpy(np.random.randn(self.layer2.out_features, self.layer2.in_features).astype(np.float32))
-            layer2_bias = torch.from_numpy(np.random.randn(self.layer2.out_features).astype(np.float32))
-            self.layer1.weight.copy_(layer1_weights)
-            self.layer1.bias.copy_(layer1_bias)
-            self.layer2.weight.copy_(layer2_weights)
-            self.layer2.bias.copy_(layer2_bias)
+        # with torch.no_grad():
+        #     layer1_weights = torch.from_numpy(np.random.randn(self.layer1.out_features,self.layer1.in_features).astype(np.float32))*0.01
+        #     layer1_bias = torch.from_numpy(np.random.randn(self.layer1.out_features).astype(np.float32))*0.01
+        #     layer2_weights = torch.from_numpy(np.random.randn(self.layer2.out_features, self.layer2.in_features).astype(np.float32))*0.01
+        #     layer2_bias = torch.from_numpy(np.random.randn(self.layer2.out_features).astype(np.float32))*0.01
+        #     layer3_weights = torch.from_numpy(np.random.randn(self.layer3.out_features, self.layer3.in_features).astype(np.float32)) * 0.01
+        #     layer3_bias = torch.from_numpy(np.random.randn(self.layer3.out_features).astype(np.float32))*0.01
+        #     self.layer1.weight.copy_(layer1_weights)
+        #     self.layer1.bias.copy_(layer1_bias)
+        #     self.layer2.weight.copy_(layer2_weights)
+        #     self.layer2.bias.copy_(layer2_bias)
+        #     self.layer3.weight.copy_(layer3_weights)
+        #     self.layer3.bias.copy_(layer3_bias)
 
     def forward(self, x):
         x = torch.relu(self.layer1(x))
-        # x = torch.relu(self.layer2(x))
-        x = torch.softmax(self.layer2(x), 1)
+        x = torch.relu(self.layer2(x))
+        x = torch.softmax(self.layer3(x), 1)
         return x
 
 BATCH_SIZE = 4000
@@ -47,12 +51,13 @@ TOTAL_SIZE = 60000
 # Load the MNIST dataset
 transform = transforms.Compose([transforms.ToTensor()])
 train_dataset = datasets.MNIST(root='../mnist', train=True, transform=transform)
+test_dataset = datasets.MNIST(root='../mnist', train=False, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=custom_collate)
-
+test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=True, collate_fn=custom_collate)
 # Set up the model, loss function, and optimizer
 model = SimpleNN()
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.01)
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 
 # Training the model
 num_epochs = 100
@@ -60,6 +65,7 @@ num_epochs = 100
 for epoch in range(num_epochs):
     total_loss = 0
     total_correct = 0
+    testCorrect = 0
     for images, labels, one_hot in train_loader:
         # Flatten the images
         images = images.view(images.size(0), -1)
@@ -75,7 +81,16 @@ for epoch in range(num_epochs):
         optimizer.step()
         
         total_loss += loss.item()
+    with torch.no_grad():
+        for images, labels, encoding in test_loader:
+            images = images.view(images.size(0), -1)
+        
+            # Forward pass
+            outputs = model(images)
+            predictions = torch.argmax(outputs, 1)
+            testCorrect += torch.sum(predictions==labels)
     accuracy = total_correct / TOTAL_SIZE
-    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.4f}, Accuracy: {accuracy*100}%')
+    testAccuracy = testCorrect / 10000
+    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.8f}, Accuracy: {accuracy*100:10.4f}%\tTest Accuracy: {testAccuracy*100:10.4f}%')
 
 print("Training complete.")
