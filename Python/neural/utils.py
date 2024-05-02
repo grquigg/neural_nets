@@ -1,13 +1,30 @@
 import numpy as np
 import struct
 from array import array
+from scipy.special import softmax
 
 def sigmoid(x):
     return 1/(1+np.exp(-x))
 
-def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
+def sigmoid_derivative(x):
+    return np.multiply(sigmoid(x), (1 - sigmoid(x)))
 
+def softMax(x):
+    return softmax(x, axis=1)
+
+def relu(x) -> np.ndarray:
+    return np.maximum(0, x)
+
+def relu_derivative(x) -> np.ndarray:
+    return (x > 0).astype(float)
+
+
+def get_derivative_for_activation_fn(fn):
+    if fn == relu:
+        return relu_derivative
+    elif fn == sigmoid:
+        return sigmoid_derivative
+    
 def read_file(path) -> np.ndarray:
     inputs = None
     with open(path, 'rb') as file:
