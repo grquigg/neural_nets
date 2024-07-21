@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from context import NeuralNetwork, softMax, sigmoid
+from context import NeuralNetwork, softMax, sigmoid, relu
 
 class TestNNExampleOne(unittest.TestCase):
     @classmethod
@@ -14,9 +14,10 @@ class TestNNExampleOne(unittest.TestCase):
 
     @classmethod
     def tearDownModule(cls):
-        pass
+        cls.model.activation_fn = sigmoid
 
     def test_activations_for_ex_one(self):
+        self.model.final_activations = sigmoid
         correct = [[0.32000,0.68000],[0.67700,0.75384,0.58817,0.70566],[0.87519,0.89296,0.81480],[0.83318, 0.84132]]
         self.model.forward_prop(self.x[0])
         for i in range(len(self.model.activations)):
@@ -29,12 +30,14 @@ class TestNNExampleOne(unittest.TestCase):
             self.assertTrue(np.allclose(correct[i], self.model.activations[f'a{i}'], atol=1e-5))
 
     def test_final_activation_softMax_for_ex_one(self):
+        self.model.activation_fn = sigmoid
         self.model.final_activations = softMax
         output = self.model.forward_prop(self.x[0])
         
         self.assertTrue(np.allclose(output, [[0.4850698, 0.5149302]]))
 
     def test_final_activation_softMax_for_ex_two(self):
+        self.model.activation_fn = sigmoid
         self.model.final_activations = softMax
         output = self.model.forward_prop(self.x[1])
         self.assertTrue(np.allclose(output, [[0.4841319, 0.5158681]]))
@@ -47,6 +50,8 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.activations['a3'], [[0.83318, 0.84132], [0.82953,0.83832]]))
 
     def test_deltas_for_ex_one(self):
+        self.model.activation_fn = sigmoid
+        self.model.final_activations = sigmoid
         out = self.model.forward_prop([self.x[0]])
         self.model.backprop(out, self.y[0], regularize=False)
         self.assertTrue(np.allclose(self.model.deltas[2], [[0.08318,-0.13868]], atol=1e-5))
@@ -65,6 +70,8 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.grad_biases['db3'], [0.08318,-0.13868], atol=1e-5))
     
     def test_deltas_for_ex_two(self):
+        self.model.activation_fn = sigmoid
+        self.model.final_activations = sigmoid
         out = self.model.forward_prop([self.x[1]])
         self.model.backprop(out, self.y[1], regularize=False)
         self.assertTrue(np.allclose(self.model.deltas[2], [[0.07953,0.55832]], atol=1e-5))
@@ -83,6 +90,8 @@ class TestNNExampleOne(unittest.TestCase):
     Also a good check to see whether or not the implementation for regularization actually works or not.
     """
     def test_deltas_for_both(self):
+        self.model.activation_fn = sigmoid
+        self.model.final_activations = sigmoid
         out = self.model.forward_prop(self.x)
         self.model.regularizer = 0.250
         self.model.backprop(out, self.y, regularize=True)
@@ -93,6 +102,40 @@ class TestNNExampleOne(unittest.TestCase):
         self.assertTrue(np.allclose(self.model.grad_biases['db1'], [0.00804, 0.00666, 0.00973, 0.00776], atol=1e-4))
         self.assertTrue(np.allclose(self.model.grad_biases['db2'], [0.01071, 0.02442, 0.03056], atol=1e-4))
         self.assertTrue(np.allclose(self.model.grad_biases['db3'], [0.08135, 0.20982], atol=1e-4))
+
+    #we should test that the forward pass is working as we might expect it to be
+    def test_forward_pass_relu(self):
+        self.model.activation_fn = relu
+        self.model.final_activations = softMax
+        self.model.forward_prop(self.x)
+        self.assertTrue(np.allclose(self.model.activations['a1'], [[0.74, 1.1192, 0.3564, 0.8744], [0.5525, 0.8138, 0.1761, 0.6041]], atol=1e-4))
+        self.assertTrue(np.allclose(self.model.activations['a2'], [[1.96536 , 2.296904, 1.664372], [1.38873 , 1.858811, 1.166318]], atol=1e-4))
+        self.assertTrue(np.allclose(self.model.activations['a3'], [[0.47493816, 0.52506184], [0.44214564, 0.55785436]]))
+        self.assertTrue(np.allclose(np.sum(self.model.activations['a3'], axis=1), [[1.0, 1.0]]))
     
+    #important note that the deltas should be unaffected by whether or not we actually include regularization as a parameter in the network
+    def test_backward_pass_relu(self):
+        self.model.activation_fn = relu
+        self.model.final_activations = softMax
+        self.model.regularizer = 0.250
+        out = self.model.forward_prop(self.x)
+        self.model.backprop(out, self.y, regularize=True)
+        self.assertTrue(np.allclose(self.model.deltas[2], [[-0.27506184, -0.45493816],[-0.30785436,  0.27785436]], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.deltas[1], [[-0.28479762, -0.54771722, -0.45969011], [-0.24004786,  0.13466281,  0.0285567]]))
+        self.assertTrue(np.allclose(self.model.deltas[0], [[-0.6782821 , -0.5171672 , -0.7658614 , -0.77661437], [-0.08828193,  0.01617122, -0.16764972, -0.08642163]], atol=1e-5))
+        self.assertTrue(np.allclose(self.model.gradients['dW3'], [[-0.37531106, -0.24162629],
+       [-0.54951686, -0.14548527],
+       [-0.34218066, -0.13030989]]))
+        self.assertTrue(np.allclose(self.model.gradients['dW2'], [[-0.08793834, -0.11295477, -0.09219655],
+       [-0.23954822, -0.22670826, -0.14562286],
+       [ 0.04811285, -0.04574615,  0.00684764],
+       [-0.08826997, -0.08753707, -0.18110096]]))
+        self.assertTrue(np.allclose(self.model.gradients['dW1'], [[-0.12641214, -0.06353569, -0.16836246, -0.11637328],
+       [-0.18149873, -0.10817513, -0.20956937, -0.1799131 ]]))
+        self.assertTrue(np.allclose(self.model.grad_biases['db3'], [[-0.2914581, -0.0885419]]))
+        self.assertTrue(np.allclose(self.model.grad_biases['db2'], [[-0.26242274, -0.20652721, -0.2155667 ]]))
+        self.assertTrue(np.allclose(self.model.grad_biases['db1'], [[-0.38328202, -0.25049799, -0.46675556, -0.431518 ]]))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 from neural.utils import computeAccuracy, read_file, relu, softMax
 from neural.nn import NeuralNetwork
 import numpy as np
+import pandas as pd
 np.random.seed(1)
 
 if __name__ == "__main__":
@@ -9,15 +10,16 @@ if __name__ == "__main__":
     input_test_path = "../mnist/t10k-images.idx3-ubyte"
     output_test_path = "../mnist/t10k-labels.idx1-ubyte"
     BATCH_SIZE = 4000
-    TEST_BATCH_SIZE = 5000
+    TEST_BATCH_SIZE = 10
     FULL_SIZE = 60000
     regularizer = 1
-    learning_rate = 0.01
-    epochs = 400
+    learning_rate = 0.001
+    epochs = 10
     layers = [784, 64, 10]
     # Initialize inputs array with zeros and then set specific indices to 1.0
     inputs = read_file(input_train_path)
-    inputs = np.reshape(inputs, (60000, 784)).astype(float)
+    inputs = np.reshape(inputs, (60000, 784))
+    inputs = inputs.astype(float)
     inputs /= 255.0
     # Initialize outputs array with zeros and then set specific indices to 1.0
     outputs = read_file(output_train_path)
@@ -37,9 +39,8 @@ if __name__ == "__main__":
     weights = []
     biases = []
     for i in range(len(layers)-1):
-        weights.append(np.random.randn(layers[i], layers[i+1])*0.01)
-        biases.append(np.random.randn(1, layers[i+1])*0.01)
-
+        weights.append(np.ones((layers[i], layers[i+1]))*0.01)
+        biases.append(np.ones((1, layers[i+1]))*0.01)
     model = NeuralNetwork(layers, biases, weights, learning_rate=learning_rate, activation_fn=relu, final_activation=softMax, regularizer=regularizer)
     for epoch in range(epochs):
         testAccuracy = 0
@@ -49,13 +50,15 @@ if __name__ == "__main__":
         logLoss = 0
         for i in range(0, FULL_SIZE, BATCH_SIZE):
             predicted = model.forward_prop(inputs[i:i+BATCH_SIZE])
+            # print(model.activations["a1"])
+            # print(model.activations["a2"])
             numCorrect += computeAccuracy(predicted, output_one_hot[i:i+BATCH_SIZE])
-            logLoss += model.cost(predicted, output_one_hot[i:i+BATCH_SIZE], regularize=True)
-            model.backprop(predicted, output_one_hot[i:i+BATCH_SIZE], regularize=True)
+            logLoss += model.cost(predicted, output_one_hot[i:i+BATCH_SIZE], regularize=False)
+            model.backprop(predicted, output_one_hot[i:i+BATCH_SIZE], regularize=False)
             model.update_weights()
-        for i in range(0, 10000, TEST_BATCH_SIZE):
-            predictions = model.forward_prop(test_inputs[i:i+TEST_BATCH_SIZE])
-            numTestCorrect += computeAccuracy(predictions, test_output_one_hot[i:i+TEST_BATCH_SIZE])
+        # for i in range(0, 10000, TEST_BATCH_SIZE):
+        #     predictions = model.forward_prop(test_inputs[i:i+TEST_BATCH_SIZE])
+        #     numTestCorrect += computeAccuracy(predictions, test_output_one_hot[i:i+TEST_BATCH_SIZE])
         accuracy = numCorrect / FULL_SIZE * 100
         testAccuracy = numTestCorrect / 10000 * 100
         print(f"Epoch {epoch+1:3d}\tTrain Accuracy: {accuracy:7.4f}%\tTest Accuracy: {testAccuracy:7.4f}%\t\tLog loss {logLoss / (FULL_SIZE / BATCH_SIZE):.5f}")
