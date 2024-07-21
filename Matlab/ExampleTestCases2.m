@@ -113,13 +113,39 @@ classdef ExampleTestCases2 < matlab.unittest.TestCase
         function testBackpropDelta(testCase)
             testCase.model.final_activation_fn = @utils.softmax;
             testCase.model.forward_pass(testCase.inputs);
-            testCase.model.backprop(testCase.inputs, testCase.outputs);
+            testCase.model.backprop(testCase.inputs, testCase.outputs, false);
             testCase.verifyEqual(testCase.model.deltas{3}, [-0.2649302,-0.4650698;-0.2658681,0.2358681], "AbsTol", 1e-6);
             testCase.verifyEqual(testCase.model.deltas{2}, [-0.03025601,-0.05286462,-0.06961101;-0.02497924,0.0115818,0.00352154], "AbsTol", 1e-6);
             %gradient matrices must be same size as the weights
             testCase.verifyEqual(size(testCase.model.gradients{3}), size(testCase.model.weights{3}));
             testCase.verifyEqual(size(testCase.model.gradients{2}), size(testCase.model.weights{2}));
             testCase.verifyEqual(size(testCase.model.gradients{1}), size(testCase.model.weights{1}));
+        end
+
+        function testForwardPassRelu(testCase)
+            testCase.model.activation_fn = @utils.relu;
+            testCase.model.final_activation_fn = @utils.softmax;
+            testCase.model.forward_pass(testCase.inputs);
+            testCase.verifyEqual(testCase.model.activations{2}, [0.74, 1.1192, 0.3564, 0.8744;0.5525, 0.8138, 0.1761, 0.6041], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.activations{3}, [1.96536 , 2.296904, 1.664372; 1.38873 , 1.858811, 1.166318], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.activations{4}, [0.47493816, 0.52506184;0.44214564, 0.55785436], "AbsTol", 1e-4);
+        end
+
+        function testBackwardPassReluWithRegularization(testCase)
+            testCase.model.activation_fn = @utils.relu;
+            testCase.model.final_activation_fn = @utils.softmax;
+            testCase.model.regularization = 0.250;
+            testCase.model.forward_pass(testCase.inputs);
+            testCase.model.backprop(testCase.inputs, testCase.outputs, true);
+            testCase.verifyEqual(testCase.model.deltas{3}, [-0.27506184, -0.45493816;-0.30785436,  0.27785436], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.deltas{2}, [-0.28479762, -0.54771722, -0.45969011;-0.24004786,  0.13466281,  0.0285567], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.deltas{1}, [-0.6782821 , -0.5171672 , -0.7658614 , -0.77661437;-0.08828193,  0.01617122, -0.16764972, -0.08642163], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.gradients{3}, [-0.37531106, -0.24162629;-0.54951686, -0.14548527;-0.34218066, -0.13030989], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.gradients{2}, [-0.08793834, -0.11295477, -0.09219655;-0.23954822, -0.22670826, -0.14562286; 0.04811285, -0.04574615,  0.00684764;-0.08826997, -0.08753707, -0.18110096], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.gradients{1}, [-0.12641214, -0.06353569, -0.16836246, -0.11637328; -0.18149873, -0.10817513, -0.20956937, -0.1799131 ], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.grad_biases{3}, [-0.2914581, -0.0885419], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.grad_biases{2}, [-0.26242274, -0.20652721, -0.2155667 ], "AbsTol", 1e-4);
+            testCase.verifyEqual(testCase.model.grad_biases{1}, [-0.38328202, -0.25049799, -0.46675556, -0.431518 ], "AbsTol", 1e-4);
         end
     end
 end
