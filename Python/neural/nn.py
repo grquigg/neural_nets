@@ -40,6 +40,7 @@ class NeuralNetwork:
         self.z[f'z{i}'] = a
         if(verbose):
             print("z{}: {}".format(i+2, a[0]))
+        self.z.append(a)
         a = self.final_activations(a)
         self.activations[f"a{i}"] = a
         if(verbose):
