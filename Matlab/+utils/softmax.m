@@ -1,5 +1,7 @@
 function probs = softmax(arr)
+     
+     arr = arr - max(arr, [], 2);
      logits = exp(arr);
-     total = log(sum(logits, 2));
-     probs = exp(arr - total);
+     total = sum(logits, 2);
+     probs = logits ./ total;
 end

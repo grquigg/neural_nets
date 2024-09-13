@@ -1,5 +1,5 @@
 function loss = crossEntropyLoss(expected, actual)
-    epsilon = 1e-12;
+    epsilon = 1e-15;
     actual = max(epsilon, min(1-epsilon, actual));
     
     % Calculate the cross-entropy loss
