@@ -10,24 +10,43 @@ class Network(val layers: Array[Int], val weights: Array[DenseMatrix[Double]], v
 
     val activations: Array[DenseMatrix[Double]] = Array.ofDim[DenseMatrix[Double]](layers.length);
     val gradients: Array[DenseMatrix[Double]] = Array.ofDim[DenseMatrix[Double]](layers.length-1);
-    val grad_biases: Array[DenseMatrix[Double]] = Array.ofDim[DenseMatrix[Double]](layers.length-1);
+    val grad_biases: Array[DenseVector[Double]] = Array.ofDim[DenseVector[Double]](layers.length-1);
     var final_activation: DenseMatrix[Double] => DenseMatrix[Double] = Utils.sigmoid
     var deltas: Array[DenseMatrix[Double]] = Array.ofDim[DenseMatrix[Double]](layers.length-1);
     var activation_fn: DenseMatrix[Double] => DenseMatrix[Double] = Utils.sigmoid;
     var dactivations: DenseMatrix[Double] => DenseMatrix[Double] = Utils.dsigmoid;
+    var regularizer: Double = 0.0;
+    var regularization: Boolean = false;
 
     def this(layers: Array[Int], 
         weights: Array[DenseMatrix[Double]], 
         biases: Array[DenseVector[Double]], 
         final_activation: DenseMatrix[Double] => DenseMatrix[Double],
         activation_fn: DenseMatrix[Double] => DenseMatrix[Double],
-        derivative_fn: DenseMatrix[Double] => DenseMatrix[Double]
+        derivative_fn: DenseMatrix[Double] => DenseMatrix[Double],
     ) = {
         this(layers, weights, biases);
         this.final_activation = final_activation;
         this.activation_fn = activation_fn;
         this.dactivations = derivative_fn
     }
+
+        def this(layers: Array[Int], 
+        weights: Array[DenseMatrix[Double]], 
+        biases: Array[DenseVector[Double]], 
+        final_activation: DenseMatrix[Double] => DenseMatrix[Double],
+        activation_fn: DenseMatrix[Double] => DenseMatrix[Double],
+        derivative_fn: DenseMatrix[Double] => DenseMatrix[Double],
+        regularizer: Double
+    ) = {
+        this(layers, weights, biases);
+        this.final_activation = final_activation;
+        this.activation_fn = activation_fn;
+        this.dactivations = derivative_fn;
+        this.regularizer = regularizer;
+        this.regularization = true;
+    }
+
 
     def forward_pass(inputs: DenseMatrix[Double]) = {
         activations(0) = inputs;
@@ -50,11 +69,21 @@ class Network(val layers: Array[Int], val weights: Array[DenseMatrix[Double]], v
         println("Biases");
         for(i<- (length - 1) to 0 by -1) {
             println("Index: " + i.toString);
-            gradients(i+1) = (deltas(i+1).t * activations(i+1)) / activations(0).rows.toDouble
+            gradients(i+1) = (deltas(i+1).t * activations(i+1))
             deltas(i) = deltas(i+1) * weights(i+1);
             deltas(i) = deltas(i) *:* this.dactivations(activations(i+1));
+            grad_biases(i) = deltas(i);
         }
-        gradients(0) = (deltas(0).t * activations(0)) / activations(0).rows.toDouble;
+        gradients(0) = (deltas(0).t * activations(0));
+
+        for(i <- (length) to 0 by -1) {
+            if(this.regularization) {
+                var mask = this.weights(i) * this.regularizer;
+                gradients(i) += mask;
+            }
+            gradients(i) = gradients(i) / activations(0).rows.toDouble
+            grad_biases(i) = grad_biases(i) / activations(0).rows.toDouble
+        }
     }
 
 }

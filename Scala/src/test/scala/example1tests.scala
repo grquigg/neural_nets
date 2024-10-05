@@ -98,4 +98,9 @@ class Example1Spec extends AnyFlatSpec with Matchers with BeforeAndAfter {
       assert(approximatelyEqualMatrices(model.gradients(1), DenseMatrix((0.0862,0.07735))));
       assert(approximatelyEqualMatrices(model.gradients(0), DenseMatrix((0.05077172),(0.06092607))));
   }
+
+  "Deltas and gradients" should "be correct for the backprop algorithm with sigmoid and regularization" in {
+      model.activation_fn = Utils.sigmoid;
+      model.regularization = true;
+  }
 }
