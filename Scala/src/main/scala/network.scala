@@ -58,24 +58,20 @@ class Network(val layers: Array[Int], val weights: Array[DenseMatrix[Double]], v
         activations(layers.length-1) = activations(layers.length-2) * weights(layers.length-2).t;
         activations(layers.length-1) = activations(layers.length-1)(*, ::) + biases(layers.length-2);
         activations(layers.length-1) = this.final_activation(activations(layers.length-1));
-        println("Success");
     }
 
     def backprop(outputs: DenseMatrix[Double]) = {
         var length = deltas.length - 1;
         deltas(length) = activations(length+1) - outputs;
-        println(deltas(length));
-        grad_biases(length) = deltas(length);
-        println("Biases");
+        grad_biases(length) = sum(deltas(length)(::, *)).t;
         for(i<- (length - 1) to 0 by -1) {
-            println("Index: " + i.toString);
             gradients(i+1) = (deltas(i+1).t * activations(i+1))
             deltas(i) = deltas(i+1) * weights(i+1);
             deltas(i) = deltas(i) *:* this.dactivations(activations(i+1));
-            grad_biases(i) = deltas(i);
+            grad_biases(i) = sum(deltas(i)(::, *)).t;
         }
         gradients(0) = (deltas(0).t * activations(0));
-
+        grad_biases(0) = sum(deltas(0)(::, *)).t;
         for(i <- (length) to 0 by -1) {
             if(this.regularization) {
                 var mask = this.weights(i) * this.regularizer;

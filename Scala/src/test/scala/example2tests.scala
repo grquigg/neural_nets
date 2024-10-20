@@ -72,11 +72,11 @@ class Example2Spec extends AnyFlatSpec with Matchers with BeforeAndAfter {
       assert(approximatelyEqualMatrices(model.deltas(2), DenseMatrix((0.08318,-0.13868),(0.07953,0.55832))));
       assert(approximatelyEqualMatrices(model.deltas(1), DenseMatrix((0.00639,-0.00925,-0.00779),(0.01503,0.05809,0.06892))));
       assert(approximatelyEqualMatrices(model.deltas(0), DenseMatrix((-0.00087,-0.00133,-0.00053,-0.00070), (0.01694,0.01465,0.01999,0.01622))));
-      println("GRADIENT");
-      println(model.gradients(0));
       assert(approximatelyEqualMatrices(model.gradients(0), DenseMatrix((0.02564, 0.01837, 0.03196, 0.05037),(0.04987, 0.06719, 0.05252, 0.08492)).t));
       assert(approximatelyEqualMatrices(model.gradients(1), DenseMatrix((0.09068, 0.06780, 0.08924), (0.02512, 0.04164, 0.12094), (0.12597, 0.05308, 0.10270), (0.11586, 0.12677, 0.03078)).t));
       assert(approximatelyEqualMatrices(model.gradients(2), DenseMatrix((0.17935, 0.19195), (0.12476, 0.30343), (0.13186, 0.25249)).t));
       assert(approximatelyEqualVectors(model.grad_biases(0), DenseVector(0.00804, 0.00666, 0.00973, 0.00776)));
+      assert(approximatelyEqualVectors(model.grad_biases(1), DenseVector(0.01071, 0.02442, 0.03056)));
+      assert(approximatelyEqualVectors(model.grad_biases(2), DenseVector(0.08135, 0.20982)));
   }
 }
