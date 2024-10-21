@@ -23,6 +23,11 @@ class Example1Spec extends AnyFlatSpec with Matchers with BeforeAndAfter {
     (m1 - m2).toArray.forall(_.abs < tolerance)
   }
 
+  def approximatelyEqualVectors(v1: DenseVector[Double], v2: DenseVector[Double], tolerance: Double = 1e-4): Boolean = {
+    if (v1.size != v2.size) return false
+    (v1 - v2).toArray.forall(_.abs < tolerance)
+  }
+
   before {
     layers = Array(1,2,1);
     weights = Array(
@@ -75,6 +80,8 @@ class Example1Spec extends AnyFlatSpec with Matchers with BeforeAndAfter {
       assert(model.gradients(0).cols == 1);
       assert(approximatelyEqualMatrices(model.gradients(1), DenseMatrix((0.14037,0.13756))));
       assert(approximatelyEqualMatrices(model.gradients(0), DenseMatrix((0.01333), (0.01618))));
+      assert(approximatelyEqualVectors(model.grad_biases(1), DenseVector(0.23)));
+      assert(approximatelyEqualVectors(model.grad_biases(0), DenseVector(0.02735, 0.03318)));
   }
 
   "Forward prop" should "be correct for relu activations" in {
@@ -97,10 +104,7 @@ class Example1Spec extends AnyFlatSpec with Matchers with BeforeAndAfter {
       assert(model.gradients(0).cols == 1);
       assert(approximatelyEqualMatrices(model.gradients(1), DenseMatrix((0.0862,0.07735))));
       assert(approximatelyEqualMatrices(model.gradients(0), DenseMatrix((0.05077172),(0.06092607))));
-  }
-
-  "Deltas and gradients" should "be correct for the backprop algorithm with sigmoid and regularization" in {
-      model.activation_fn = Utils.sigmoid;
-      model.regularization = true;
+      assert(approximatelyEqualVectors(model.grad_biases(1), DenseVector(0.190225)));
+      assert(approximatelyEqualVectors(model.grad_biases(0), DenseVector(0.0951, 0.114135)));
   }
 }
