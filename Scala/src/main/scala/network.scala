@@ -82,4 +82,11 @@ class Network(val layers: Array[Int], val weights: Array[DenseMatrix[Double]], v
         }
     }
 
+    def updateWeights(learningRate: Double) = {
+        for(i <- 0 to weights.length-1) {
+            weights(i) = weights(i) - gradients(i) * learningRate;
+            biases(i) = biases(i) - grad_biases(i) * learningRate;
+        }
+    }
+
 }
