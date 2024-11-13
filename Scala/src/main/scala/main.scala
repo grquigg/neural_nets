@@ -70,7 +70,7 @@ object Main {
         inputs = inputs / 255.0;
         var outputs: DenseMatrix[Short] = readUByteFile(train_label_path);
         //set layer params
-        var layers: Array[Int] = Array(784, 10);
+        var layers: Array[Int] = Array(784, 64, 10);
         var weights: Array[DenseMatrix[Double]] = Utils.initializeWeights(layers);
         var biases: Array[DenseVector[Double]] = Utils.initializeBiases(layers);
         var output_one_hot: DenseMatrix[Double] = convertInputsToOneHot(outputs);
