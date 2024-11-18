@@ -4,6 +4,26 @@
 
 //////////DEVICES////////
 
+
+////ACTIVATIONS AND ACTIVATION DERIVATIVES////
+
+
+__device__ void reLU(float* mat, int startX, int endX, int startY, int endY, int width) {
+    for (int i = startY; i < endY; i++) {
+        for(int j = startX; j < endX; j++) {
+            mat[i*width + j] = max(0.0f, mat[i*width + j]);
+        }
+    }
+}
+
+__global__ void testRelu(float* mat, int height, int width) {
+    int y_step = height / gridDim.x;
+    int x_step = width / blockDim.x;
+    int y_index = y_step * blockIdx.x;
+    int x_index = x_step * threadIdx.x;
+    reLU(mat, x_index, x_index + x_step, y_index, y_index + y_step, width);
+}
+
 __device__ void softmax(float* product, int product_height, int product_width) {
     float total = 0.0;
     float logSumTotal = 0.0;
@@ -38,6 +58,9 @@ __global__ void sigmoidD(float* activations, int height, int width, float * delt
         delta[index*batch+i] *= activations[index*batch+i] * (1-activations[index*batch+i]);
     }
 }
+
+
+
 __device__ float* transposeMatrix(float * matrix, int matrix_height, int matrix_width) {
     float * transpose = new float[matrix_width*matrix_height];
     for(int i = 0; i < matrix_height; i++) {

@@ -191,3 +191,37 @@ TEST(Main, MultiThreadedDotProductTransposeMatrix2) {
     }
     cudaFree(dproduct);
 }
+
+TEST(Main, ReluExampleSingleThread) {
+    float arr1[6] = {1,2,3,4,5,6}; // 2 x 3 matrix
+    float arr2[12] = {-1,-5,-9,-2,-6,-10,-3,-7,-11,-4,-8,-12}; // 4 x 3 matrix
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 3, 4);
+    testRelu<<<1, 1>>>(darr1.get(), 2, 3);
+    testRelu<<<1, 1>>>(darr2.get(), 3, 4);
+    cudaMemcpy(arr1, darr1.get(), 6*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr2, darr2.get(), 12*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int i = 0; i < 6; i++) {
+        EXPECT_FLOAT_EQ(arr1[i], i+1);
+    }
+    for(int i = 0; i < 12; i++) {
+        EXPECT_FLOAT_EQ(arr2[i], 0);
+    }
+}
+
+TEST(Main, ReluExampleMultiThread) {
+    float arr1[6] = {1,2,3,4,5,6}; // 2 x 3 matrix
+    float arr2[12] = {-1,-5,-9,-2,-6,-10,-3,-7,-11,-4,-8,-12}; // 4 x 3 matrix
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 4, 3);
+    testRelu<<<2, 3>>>(darr1.get(), 2, 3);
+    testRelu<<<4, 3>>>(darr2.get(), 4, 3);
+    cudaMemcpy(arr1, darr1.get(), 6*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr2, darr2.get(), 12*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int i = 0; i < 6; i++) {
+        EXPECT_FLOAT_EQ(arr1[i], i+1);
+    }
+    for(int i = 0; i < 12; i++) {
+        EXPECT_FLOAT_EQ(arr2[i], 0);
+    }
+}

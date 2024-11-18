@@ -8,7 +8,11 @@
 
 __global__ void test_func(float* mat, float* weights, float* prod, int vector_h, int vector_w);
 
-__device__ void reLU(float* mat, int height, int width);
+__device__ void reLU(float* mat, int startX, int endX, int startY, int endY, int width);
+
+__global__ void testRelu(float* mat, int height, int width);
+
+__global__ void reluDerivative(float* mat, int height, int width);
 
 __device__ void softmax(float* product, int product_height, int product_width);
 
@@ -33,6 +37,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
 __device__ void dotProduct(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias);
+
 //we can't unneccessarily waste memory on the GPU so I have to get creative and take a second attempt at writing the modified dotProduct function
 __device__ float* transposeMatrix(float * matrix, int matrix_height, int matrix_width);
 
@@ -41,6 +46,7 @@ __global__ void setTranspose(NeuralNetwork* model);
 __device__ void dotProductTranspose(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
 
 __global__ void dotProductTransposeSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, bool useHeight);
+
 //////////GLOBALS////////
 
 __global__ void predict(LogisticRegression* model, float* inputs, float* product, int size);
@@ -74,6 +80,7 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
 
 __global__ void linear_forward(NeuralNetwork* model, float* inputs, float* activations, int * offsets, int size);
 
+__global__ void linear_forward_relu(NeuralNetwork* model, float* inputs, float* activations, int* offsets, int size);
 ////DEBUGGING FUNCTIONS
 __global__ void auditGradients(NeuralNetwork* model);
 
