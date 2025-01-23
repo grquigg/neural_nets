@@ -8,11 +8,11 @@
 
 __global__ void test_func(float* mat, float* weights, float* prod, int vector_h, int vector_w);
 
-__device__ void reLU(float* mat, int startX, int endX, int startY, int endY, int width);
-
-__global__ void testRelu(float* mat, int height, int width);
+__device__ void relu(float* inputs, int size);
 
 __global__ void reluDerivative(float* mat, int height, int width);
+
+__global__ void testRelu(float* mat, int height, int width);
 
 __device__ void softmax(float* product, int product_height, int product_width);
 
@@ -81,10 +81,19 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
 __global__ void linear_forward(NeuralNetwork* model, float* inputs, float* activations, int * offsets, int size);
 
 __global__ void linear_forward_relu(NeuralNetwork* model, float* inputs, float* activations, int* offsets, int size);
+
 ////DEBUGGING FUNCTIONS
 __global__ void auditGradients(NeuralNetwork* model);
 
 __global__ void auditDeltas(NeuralNetwork* model, float* deltas, int* offsets, int batches, int batch_size);
 
 __global__ void auditWeights(NeuralNetwork* model);
+
+////HOST FUNCTIONS
+void sigmoidHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker);
+
+void reluHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker);
+
+void softmaxHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker);
+
 #endif

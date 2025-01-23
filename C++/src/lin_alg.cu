@@ -2,11 +2,28 @@
 #include <iostream>
 #include "../include/lin_alg.h"
 
-//////////DEVICES////////
+//////////HOST FUNCTIONS////////
+void sigmoidHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker) {
+    sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(inputs, size);
+}
 
+void reluHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker) {
+    if(size % nWorkers * nThreadsPerWorker != 0) {
+        return;
+    } 
+    testRelu<<<nWorkers, nThreadsPerWorker>>>(inputs, nWorkers, nThreadsPerWorker);
+}
 
+void softmaxHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker) {
+    softmaxSegmented<<<nWorkers, nThreadsPerWorker>>>(inputs, height, width);
+}
 ////ACTIVATIONS AND ACTIVATION DERIVATIVES////
 
+__device__ void relu(float* inputs, int size) {
+    for(int i = 0; i < size; i++) {
+        inputs[i] = max(0.0f, inputs[i]);
+    }
+}
 
 __device__ void reLU(float* mat, int startX, int endX, int startY, int endY, int width) {
     for (int i = startY; i < endY; i++) {
@@ -17,6 +34,9 @@ __device__ void reLU(float* mat, int startX, int endX, int startY, int endY, int
 }
 
 __global__ void testRelu(float* mat, int height, int width) {
+    if(height % gridDim.x != 0 || width % blockDim.x != 0) {
+        return;
+    }
     int y_step = height / gridDim.x;
     int x_step = width / blockDim.x;
     int y_index = y_step * blockIdx.x;

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 
+
 /*
 This code transfers allocates an array of size height*width onto device and copies the values
 of matrix to device. This code can work for both regular 1D arrays as well as flattened 2D arrays.
@@ -39,6 +40,7 @@ std::shared_ptr<int> transferMatrixToDevice(int * matrix, int height, int width)
     return return_mat;
 }
 
+
 /*
 Constructor for Neural Network when weights and/or biases are not passed in by the user.
 This constructor assumes the responsibility of allocating memory for the weights and biases as
@@ -53,6 +55,8 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size) {
         this->weights[i-1] = initializeFlatRandomArray(this->layer_size[i-1], this->layer_size[i]);
         this->biases[i-1] = initializeFlatRandomArray(1, this->layer_size[i]);
     }
+    this->activation_fn = sigmoidHost;
+    this->final_activation = softmaxHost;
 }
 
 /*
@@ -89,6 +93,8 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
     this->biases = biases;
     this->lambda = lambda;
     this->activations = nullptr;
+    this->activation_fn = sigmoidHost;
+    this->final_activation = softmaxHost;
 }
 
 void NeuralNetwork::setupDeltas(int batch_size) {
@@ -151,7 +157,7 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
     std::cout << "Layer 0" << std::endl;
     dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get(), this->d_weights[0], d_activations, batch_size, this->layer_size[0], this->layer_size[0], this->layer_size[1], this->d_biases[0]);
     cudaDeviceSynchronize();
-    sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations, batch_size*this->layer_size[1]);
+    this->activation_fn(d_activations, batch_size*this->layer_size[1], nWorkers, nThreadsPerWorkers);
     cudaDeviceSynchronize();
     int j = 1;
     for(j = 1; j < this->nLayers-1; j++) {
@@ -159,14 +165,14 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
         nThreads.y = this->layer_size[j+1];
         dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
         cudaDeviceSynchronize();
-        sigmoidSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+this->offsets[j], batch_size*this->layer_size[j+1]);
+        this->activation_fn(d_activations+this->offsets[j], batch_size*this->layer_size[j+1], nWorkers, nThreadsPerWorkers);
         cudaDeviceSynchronize();
     }
     std::cout << "Layer " << j << std::endl;
     nThreads.y = this->layer_size[j+1];
     dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
     cudaDeviceSynchronize();
-    softmaxSegmented<<<nWorkers, nThreadsPerWorkers>>>(d_activations+(this->offsets[j]), batch_size, this->layer_size[j+1]);
+    this->final_activation(d_activations+(this->offsets[j]), batch_size, this->layer_size[j+1], nWorkers, nThreadsPerWorkers);
     cudaDeviceSynchronize();
     float * activations = new float[activations_size*batch_size];
     cudaMemcpy(activations, d_activations, activations_size*batch_size*sizeof(float), cudaMemcpyDeviceToHost);

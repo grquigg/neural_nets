@@ -1,6 +1,12 @@
 #ifndef MODELS_H
 #define MODELS_H
 #include <memory>
+#include <functional>
+
+
+void linearLayer(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w);
+
+
 std::shared_ptr<float> transferMatrixToDevice(float *matrix, int height, int width);
 
 std::shared_ptr<int> transferMatrixToDevice(int * matrix, int height, int width);
@@ -44,6 +50,12 @@ class NeuralNetwork {
         int * offsets;
         std::vector<dim3> forward_pass_specs;
         std::vector<dim3> backward_pass_specs;
+
+        std::function<void(float * inputs, int size, int nWorkers, int nThreadsPerWorker)> activation_fn;
+        std::function<void()> activation_derivative;
+        std::function<void(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker)> final_activation;
+        std::function<void()> final_activation_derivative;
+
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);

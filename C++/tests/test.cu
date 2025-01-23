@@ -225,3 +225,31 @@ TEST(Main, ReluExampleMultiThread) {
         EXPECT_FLOAT_EQ(arr2[i], 0);
     }
 }
+
+TEST(Main, ReluHostExample) {
+    float arr1[6] = {1,2,3,4,5,6}; // 2 x 3 matrix
+    float arr2[12] = {-1,-5,-9,-2,-6,-10,-3,-7,-11,-4,-8,-12}; // 4 x 3 matrix
+    std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
+    std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 4, 3);
+    reluHost(darr1.get(), 6, 2, 3);
+    reluHost(darr2.get(), 12, 4, 3);
+    cudaMemcpy(arr1, darr1.get(), 6*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr2, darr2.get(), 12*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int i = 0; i < 6; i++) {
+        EXPECT_FLOAT_EQ(arr1[i], i+1);
+    }
+    for(int i = 0; i < 12; i++) {
+        EXPECT_FLOAT_EQ(arr2[i], 0);
+    }
+}
+
+TEST(Main, ReluCheckOrdering) {
+    float correct[12] = {0, 0, 0, 0, 6, 10, 3, 7, 0, 0, 0, 0};
+    float arr[12] = {-1,-5,-9,-2,6,10,3,7,-11,-4,-8,-12}; // 4 x 3 matrix
+    std::shared_ptr<float> darr = transferMatrixToDevice(arr, 4, 3);
+    reluHost(darr.get(), 12, 4, 3);
+    cudaMemcpy(arr, darr.get(), 12*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int i = 0; i < 12; i++) {
+        EXPECT_FLOAT_EQ(arr[i], correct[i]);
+    }
+}
