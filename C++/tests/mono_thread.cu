@@ -577,3 +577,74 @@ TEST(ForwardPass, NNForwardPassWithReluEx1_BATCH_SIZE_2) {
     EXPECT_FLOAT_EQ(activations.get()[j], correctOutput[j]);
   }
 }
+
+TEST(ForwardPass, NNForwardPassWithReluEx2_BATCH_SIZE_1) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 1;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float ** weights = new float*[3];
+  weights[0] = new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[1] = new float[12]{0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  weights[2] = new float[6]{0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  float ** biases = new float*[3];
+  biases[0] = new float[4]{0.42f, 0.72f, 0.01f, 0.3f};
+  biases[1] = new float[3]{0.21f, 0.87f, 0.03f};
+  biases[2] = new float[2]{0.04f, 0.17f};
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float expected[18] = {
+    0.74f, 1.1192f, 0.3564f, 0.8744f,
+    1.96536f, 2.296904f, 1.664372f,
+    0.47493816f, 0.52506184f,
+    0.5525f, 0.8138f, 0.1761f, 0.6041f,
+    1.38873f , 1.858811f, 1.166318f,
+    0.44214564f, 0.55785436f
+  };
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
+  model.activation_fn = reluHost;
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 2);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 0; j < 9; j++) {
+    EXPECT_FLOAT_EQ(activations.get()[j], expected[j]);
+  }
+  std::shared_ptr<float> d_input2(d_input, d_input.get() + 2);
+  activations = model.forward_pass(d_input2, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 9; j < 18; j++) {
+    EXPECT_FLOAT_EQ(activations.get()[j-9], expected[j]);
+  }
+}
+
+TEST(ForwardPass, NNForwardPassWithReluEx2_BATCH_SIZE_2) {
+  int nWorkers = 1;
+  int nThreadsPerWorker = 1;
+  int batch_size = 2;
+  int nLayers = 3;
+  int layers[4] = {2, 4, 3, 2};
+  float ** weights = new float*[3];
+  weights[0] = new float[8]{0.15f, 0.1f, 0.19f, 0.35f, 0.4f, 0.54f, 0.42f, 0.68f};
+  weights[1] = new float[12]{0.67f, 0.42f, 0.56f, 0.14f, 0.2f, 0.8f, 0.96f, 0.32f, 0.69f, 0.87f, 0.89f, 0.09f};
+  weights[2] = new float[6]{0.87f, 0.1f, 0.42f, 0.95f, 0.53f, 0.69f};
+  float ** biases = new float*[3];
+  biases[0] = new float[4]{0.42f, 0.72f, 0.01f, 0.3f};
+  biases[1] = new float[3]{0.21f, 0.87f, 0.03f};
+  biases[2] = new float[2]{0.04f, 0.17f};
+  float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+  float expected[18] = {
+    0.74f, 1.1192f, 0.3564f, 0.8744f,
+    0.5525f, 0.8138f, 0.1761f, 0.6041f,
+    1.96536f, 2.296904f, 1.664372f,
+    1.38873f , 1.858811f, 1.166318f,
+    0.47493816f, 0.52506184f,
+    0.44214564f, 0.55785436f
+  };
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
+  model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
+  model.activation_fn = reluHost;
+  std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 2);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  for(int j = 0; j < 18; j++) {
+    EXPECT_FLOAT_EQ(activations.get()[j], expected[j]);
+  }
+}
