@@ -4,26 +4,32 @@
 #include "../include/models.h"
 #include <memory>
 
-TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the Backprop example 1 from 589 HW4
-  int nWorkers = 1, nThreadsPerWorker = 1, batch_size = 2;
+/*
+Test to make sure that the code for calculating dot products works as expected
+where everything runs on one thread. 
+Based on the backprop example 1 from 589 HW4.
+*/
+TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) {
+  int nWorkers = 1, nThreadsPerWorker = 1, batch_size = 2, nLayers = 1;
   dim3 nBlocks(nWorkers, 1, 1);
   dim3 nThreads(nThreadsPerWorker, 1, 1);
   int * layers = new int[2]{1,2};
   float correct[4] = {0.413f, 0.326f, 0.442f, 0.384f};
   float **weights = new float*[1]{new float[2]{0.1f, 0.2f}};
   float **biases = new float*[1]{new float[2]{0.4f, 0.3f}};
-  NeuralNetwork model(1, layers, weights, biases, 1.0f);
-  model.setupGPU(1, batch_size);
+  NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
+  model.setupGPU(nWorkers, batch_size);
   float *input = new float[2]{0.13f, 0.42f};
 
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, batch_size, 1);
+
   float *d_product;
-  cudaMalloc(&d_product, 4*sizeof(float));
+  cudaMalloc(&d_product, layers[1]*batch_size*sizeof(float));
   dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get(), model.d_weights[0], d_product, batch_size, model.layer_size[0], model.layer_size[0], model.layer_size[1], model.d_biases[0]);
   cudaDeviceSynchronize();
-  float *prod = new float[4];
-  cudaMemcpy(prod, d_product, 4*sizeof(float), cudaMemcpyDeviceToHost);
-  for(int i = 0; i < 4; i++) {
+  float *prod = new float[layers[1]*batch_size];
+  cudaMemcpy(prod, d_product, layers[1]*batch_size*sizeof(float), cudaMemcpyDeviceToHost);
+  for(int i = 0; i < layers[1]*batch_size; i++) {
     EXPECT_FLOAT_EQ(prod[i], correct[i]);
   }
   cudaFree(d_product);
@@ -36,6 +42,10 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx1) { //this is based on the 
   free(prod);
 }
 
+/*
+Test to make sure that the code for calculating dot products works as expected.
+Based on the backprop example 2 from 589 HW4.
+*/
 TEST(SegmentedDotProduct, DotProductSingleThreadedEx2) { //REMEMBER THAT WE'RE TAKING THE TRANSPOSE OF THE MATRIX IN THE EXAMPLE
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
@@ -49,11 +59,15 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx2) { //REMEMBER THAT WE'RE T
   NeuralNetwork model(1, layers, weights, biases, 1.0f);
   model.setupGPU(nThreadsPerWorker*nWorkers, batch_size);
   float input[4] = {0.32f, 0.68f, 0.83f, 0.02f};
+
+  //memory allocation to GPU
   std::shared_ptr<float> d_weights = transferMatrixToDevice(model.d_weights[0], model.layer_size[0], model.layer_size[1]);
   std::shared_ptr<float> d_inputs = transferMatrixToDevice(input, 2, 2);
   std::shared_ptr<float> d_bias = transferMatrixToDevice(model.d_biases[0], model.layer_size[1], 1);
+
   float *d_product;
   cudaMalloc(&d_product, batch_size*model.layer_size[1]*sizeof(float));
+  //not sure why we're using the pointers for the weights rather than just using the weights from the model itself?
   dotProductSegmented<<<nBlocks, nThreads>>>(d_inputs.get(), d_weights.get(), d_product, batch_size, model.layer_size[0], model.layer_size[0], model.layer_size[1], d_bias.get());
   cudaDeviceSynchronize();
   float *prod = new float[batch_size*model.layer_size[0]*model.layer_size[1]];
@@ -69,6 +83,11 @@ TEST(SegmentedDotProduct, DotProductSingleThreadedEx2) { //REMEMBER THAT WE'RE T
   free(biases);
 }
 
+
+/*
+Testing segmented sigmoid activation function.
+Uses numbers for example 1 from 589 HW4.
+*/
 TEST(SegmentedSigmoid, SingleThreadedEx1) {
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
@@ -104,6 +123,11 @@ TEST(SegmentedSigmoid, SingleThreadedEx1) {
   free(biases);
 }
 
+
+/*
+Testing segmented sigmoid activation function.
+Uses numbers for example 2 from 589 HW4.
+*/
 TEST(SegmentedSigmoid, SingleThreadedEx2) {
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
@@ -140,6 +164,9 @@ TEST(SegmentedSigmoid, SingleThreadedEx2) {
   free(biases);
 }
 
+/*
+Tests full forward pass of 
+*/
 TEST(ForwardPass, SingleThreadedDotProduct2Ex1_BATCH_SIZE_1) {
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
@@ -616,6 +643,9 @@ TEST(ForwardPass, NNForwardPassWithReluEx2_BATCH_SIZE_1) {
   }
 }
 
+/*
+Covers tests with the forward_pass function 
+*/
 TEST(ForwardPass, NNForwardPassWithReluEx2_BATCH_SIZE_2) {
   int nWorkers = 1;
   int nThreadsPerWorker = 1;
@@ -647,4 +677,14 @@ TEST(ForwardPass, NNForwardPassWithReluEx2_BATCH_SIZE_2) {
   for(int j = 0; j < 18; j++) {
     EXPECT_FLOAT_EQ(activations.get()[j], expected[j]);
   }
+}
+
+//TO-DO: Cover backprop examples with single threaded examples
+
+
+/*
+Test calculating deltas for example 1 with single thread
+*/
+TEST(CalculateDeltasMono, NNCalculateDeltasLayer1_Ex1) {
+
 }

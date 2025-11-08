@@ -70,6 +70,24 @@ TEST(Main, TestBuildModel) {
   free(biases);
 }
 
+TEST(Softmax, SegmentedSoftmax) {
+    int batch_size = 2;
+    int product_width = 2;
+    float input[4] = {2, 2, 2, 2};
+    float correctOutput[4] = {0.5, 0.5, 0.5, 0.5};
+    float * actualOutput = new float[4];
+    std::shared_ptr<float> d_input = transferMatrixToDevice(input, batch_size, product_width);
+    softmaxSegmented<<<2, 1>>>(d_input.get(), batch_size, product_width); //single_threaded
+    cudaMemcpy(actualOutput, d_input.get(), 4*sizeof(float), cudaMemcpyDeviceToHost);
+    for(int i = 0; i < 4; i++) {
+        EXPECT_FLOAT_EQ(actualOutput[i], correctOutput[i]);
+    }
+    // free(d_input);
+    // free(input);
+    // free(correctOutput);
+    // free(actualOutput);
+}
+
 TEST(Main, TestCopyModelToGPU) {
   int nWorkers = 1, nThreadsPerWorker = 1;
   int layers[2] = {1, 2};

@@ -72,6 +72,10 @@ int main(int argc, char** argv) {
 
     model.setupGPU(nThreadsPerWorker*nWorkers, BATCH_SIZE);
     std::shared_ptr<float> d_input = transferMatrixToDevice(input.data(), BATCH_SIZE, model.layer_size[0]);
+
+    //TO-DO: create logic for setting up infra
+    
+    //TO-DO: write code for full 
     model.forward_pass(d_input, 2, BATCH_SIZE, nWorkers, nThreadsPerWorker);
     
     //pass training function

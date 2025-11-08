@@ -38,17 +38,18 @@ class NeuralNetwork {
         int nLayers;
         int * layer_size;
         float ** weights;
-        float ** d_weights;
+        float ** d_weights; //copy of weights on the GPU
         float ** biases;
-        float ** d_biases;
+        float ** d_biases; //copy of biases on the GPU
         float lambda;
-        float ** gradients;
-        float ** grad_biases;
+        float ** gradients; //allocated exclusively to GPU
+        float ** grad_biases; //allocated exclusively to GPU
         bool on_device = false;
         float * activations;
         float ** deltas;
         int * offsets;
-        std::vector<dim3> forward_pass_specs;
+        std::vector<dim3> forward_pass_block_specs;
+        std::vector<dim3> forward_pass_thread_specs;
         std::vector<dim3> backward_pass_specs;
 
         std::function<void(float * inputs, int size, int nWorkers, int nThreadsPerWorker)> activation_fn;
@@ -64,6 +65,10 @@ class NeuralNetwork {
         void train();
 
         void setupDeltas(int batch_size);
+
+        void setupMultiThreadSpecs(std::vector<dim3> forward, std::vector<dim3> backward);
+
+        void setupMultiThreadSpecs(int batch_size);
 
         std::shared_ptr<float> forward_pass(std::shared_ptr<float> d_input, int total_size, int batch_size, int nWorkers, int nThreadsPerWorkers) ;
 

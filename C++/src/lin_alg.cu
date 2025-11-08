@@ -56,6 +56,7 @@ __device__ void softmax(float* product, int product_height, int product_width) {
         float prob_sums = 0.0;
         for (int j = 0; j < product_width; j++) {
             product[i*product_width+j] = exp(product[i*product_width+j] - logSumTotal);
+            // printf("%f\n", product[i*product_width+j]);
             prob_sums += product[i*product_width+j];
         }
 
@@ -214,7 +215,8 @@ __device__ void dotProductTranspose(float* inputs, float* weights, float * produ
 
 __global__ void matrixSubtract(float * matrix1, float *matrix2, int m1_h, int m1_w, int m2_h, int m2_w, float* outVec) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
-    if((m1_h*m1_w) % (gridDim.x *blockDim.x) != 0) {
+    printf("%d\n", index);
+    if((m1_h*m1_w) % (gridDim.x*blockDim.x) != 0) {
         printf("BAD INPUT\n");
     }
     //this can be literally be flattened out to a linear operation
@@ -528,11 +530,11 @@ __global__ void backward_pass(NeuralNetwork* model, int batch_size, float learni
 }
 
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w) {
-    printf("This is called\n");
+
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     int index_x = blockIdx.z*blockDim.y + blockIdx.y;
     int index_y = threadIdx.z*gridDim.y + threadIdx.y;
-    if(vector_h % (gridDim.y*gridDim.z) != 0 || weight_w % (blockDim.y*blockDim.z)) {
+    if(vector_h % (gridDim.y*gridDim.z) != 0 || weight_w % (blockDim.y*blockDim.z) != 0) {
         printf("BAD ARGUMENTS\n");
         return;
     }
@@ -553,6 +555,21 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     }
 }
 
+/*
+We are passing all of the inputs along to this function and then subdividing among "mini-batches" of size batch_size.
+IT IS REQUIRED that whatever the first number in the worker and thread blocks is, the product of these numbers
+HAS to be cleanly divisible by vector_h. Vector_h is the FULL size of the matrix. 
+
+I didn't cleanly spell this out when I was working on this project beforehand, but these are the constraints that we need to have
+on blockDim and gridDim, respectively:
+Assuming that we have blockDim(nWorkers, y, z) and gridDim(nThreadsPerWorker, y, z):
+
+1. The full height of the input MUST be divisible by nWorkers*nThreadsPerWorker
+2. gridDim.y and gridDim.z control the amount of subdivisions that we want to have along the numbers
+in the ROWS of the input matrix; hence, batch_size % (gridDim.y*gridDim.z) MUST be equal to zero
+3. blockDim.y and blockDim.z control the amount of subdivisions that we want to have along the numbers
+in the COLUMNS of the input matrix; hence, weight_w % (blockDim.y*blockDim.z) MUST be equal to zero
+*/
 __global__ void dotProductSegmented(float* inputs, float* weights, float * product, int vector_h, int vector_w, int weight_h, int weight_w, float* bias) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     //we subdivide vector_h in "mini-batches" of size batch_size
@@ -577,7 +594,7 @@ __global__ void dotProductSegmented(float* inputs, float* weights, float * produ
     }
     int size_x = batch_size / (gridDim.y*gridDim.z);
     int size_y = weight_w / (blockDim.y*blockDim.z);
-    printf("Size_x: %d\nSize_y: %d\n Index x %d Index y %d\n", size_x, size_y, index_x, index_y);
+    // printf("Size_x: %d\nSize_y: %d\n Index x %d Index y %d\n", size_x, size_y, index_x, index_y);
     // printf("Start for %d %d %d\n", index, index*batch_size*vector_w, index*batch_size*weight_w);
     float* out = product+(index*batch_size*weight_w)+(size_x*index_x*weight_w)+(size_y*index_y); 
     float* input = inputs+(index*batch_size*vector_w)+((size_x*index_x*vector_w));
@@ -604,13 +621,38 @@ __global__ void sigmoidSegmented(float* inputs, int inputSize) {
 
 }
 
+
+/*
+Let's say that we want to compute the softmax of a 2x2 matrix in parallel.
+
+[1,2]
+[3,4]
+
+In the code, this is flattened to [1,2,3,4], and this what the product array points to.
+Product height is the height of the array, and product width is the width. 
+
+Example 1: We have a batch size of one, with each row being its own batch.
+There is MAXIMUM only one worker that can work on this computation and given the context 
+that softmax needs, it can ONLY compute this using one thread. We can't parallelize
+computation any more. 
+
+Example 2: We have a batch size of two, with the entire block being a batch.
+There are a few different ways that we can split this. We can split it such that:
+1. We have one worker that can compute the softmax for both of them in series (nWorkers=1, nThreads=1)
+2. We have one worker computing the softmax for both in them in parallel (nWorker=1, nThreads=2)
+3. We have two workers that can compute the softmax for both of them in parallel (nWorkers=2, nThreads=1)
+
+[1,2,3,4], product_height=2, product_width=2, blockDim.x=1, gridDim.x=2
+
+*/
 __global__ void softmaxSegmented(float* product, int product_height, int product_width) {
     if(product_height % (blockDim.x * gridDim.x) != 0) {
         printf("BAD ARGUMENT\n");
         return;
     }
     int blockSize = product_height / (blockDim.x * gridDim.x);
+
     int index = blockIdx.x*blockDim.x + threadIdx.x;
-    softmax(product+(blockSize*index), blockSize, product_width);
+    softmax(product+(blockSize*index*product_width), blockSize, product_width);
 }
 
