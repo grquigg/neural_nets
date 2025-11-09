@@ -86,6 +86,9 @@ NeuralNetwork::~NeuralNetwork() {
 
 NeuralNetwork::NeuralNetwork() {}
 
+/*
+nLayers should be one less than the size of the input (it doesn't take into account the input layer)
+*/
 NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda) {
     this->nLayers = nLayers;
     this->layer_size = layer_size;
@@ -133,9 +136,15 @@ void NeuralNetwork::setupMultiThreadSpecs(int batch_size) {
 
 
 void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std::shared_ptr<float> outputs) {
+    //calculating error can be efficiently parallelized since it's literally just subtraction
     matrixSubtract<<<batch_size,this->layer_size[this->nLayers]>>>(this->activations+this->offsets[this->nLayers-1], outputs.get(), batch_size, this->layer_size[this->nLayers], batch_size, this->layer_size[this->nLayers], this->deltas[this->nLayers-1]);
     cudaDeviceSynchronize();
+    //calculate deltas
     for(int i = this->nLayers-1; i > 0; i--) {
+        //this can be parallelized based on batch size and the size of the layer; needs to be refactored to take alternative configurations into account
+        /*
+        Ex: Batch size of 6,000 is impossible to parallelize across one GPU (due to CUDA limits as well)
+        */
         dotProductTransposeSegmented<<<batch_size, this->layer_size[i]>>>(this->deltas[i], this->d_weights[i], this->deltas[i-1], batch_size, this->layer_size[i+1], this->layer_size[i], this->layer_size[i+1], false);
         cudaDeviceSynchronize();
         sigmoidD<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
@@ -143,10 +152,10 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
     }
     std::cout << "Compute gradients" << std::endl;
     for(int i = this->nLayers-1; i > 0; i--) {
-        dotProductTransposeSegmented<<<1,1>>>(this->activations+this->offsets[i-1], this->deltas[i], this->gradients[i], batch_size, this->layer_size[i], batch_size, this->layer_size[i+1], true);
+        dotProductTransposeSegmented<<<this->layer_size[i],this->layer_size[i+1]>>>(this->activations+this->offsets[i-1], this->deltas[i], this->gradients[i], batch_size, this->layer_size[i], batch_size, this->layer_size[i+1], true);
         cudaDeviceSynchronize();
     }
-    dotProductTransposeSegmented<<<1,1>>>(inputs.get(), this->deltas[0], this->gradients[0], batch_size, this->layer_size[0], batch_size, this->layer_size[1], true);
+    dotProductTransposeSegmented<<<this->layer_size[0],this->layer_size[1]>>>(inputs.get(), this->deltas[0], this->gradients[0], batch_size, this->layer_size[0], batch_size, this->layer_size[1], true);
     cudaDeviceSynchronize();
     std::cout << "Finished training" << std::endl;
 }
@@ -171,7 +180,7 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
     cudaDeviceSynchronize();
     int j = 1;
     for(j = 1; j < this->nLayers-1; j++) {
-        std::cout << "Layer " << j << std::endl;
+        std::cout << "LOOP: Layer " << j << std::endl;
         nThreads.y = this->layer_size[j+1];
         dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
         cudaDeviceSynchronize();

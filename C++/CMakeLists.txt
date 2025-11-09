@@ -98,6 +98,9 @@ target_link_libraries(
 add_executable(main_tests tests/test.cu)
 target_link_libraries(main_tests GTest::gtest_main ${LIBNAME})
 
+add_executable(example_one tests/example_one.cu)
+target_link_libraries(example_one GTest::gtest_main ${LIBNAME})
+
 set_property(TARGET mono_threaded PROPERTY CUDA_ARCHITECTURES 50 72)
 set_property(TARGET multi_threaded PROPERTY CUDA_ARCHITECTURES 50 72)
 set_property(TARGET main_tests PROPERTY CUDA_ARCHITECTURES 50 72)
