@@ -3,11 +3,13 @@
 #include "../include/lin_alg.h"
 
 //////////HOST FUNCTIONS////////
-void sigmoidHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker) {
+void sigmoidHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker) {
+    int size = height * width;
     sigmoidSegmented<<<nWorkers, nThreadsPerWorker>>>(inputs, size);
 }
 
-void reluHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker) {
+void reluHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker) {
+    int size = height * width;
     if(size % nWorkers * nThreadsPerWorker != 0) {
         return;
     } 

@@ -4,6 +4,7 @@
 #include <chrono> 
 #include <iostream>
 #include <memory>
+#include "cublas_v2.h"
 
 
 /*
@@ -136,6 +137,8 @@ void NeuralNetwork::setupMultiThreadSpecs(int batch_size) {
 
 
 void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std::shared_ptr<float> outputs) {
+    cublasHandle_t handle;
+    cublasStatus_t status;
     //calculating error can be efficiently parallelized since it's literally just subtraction
     matrixSubtract<<<batch_size,this->layer_size[this->nLayers]>>>(this->activations+this->offsets[this->nLayers-1], outputs.get(), batch_size, this->layer_size[this->nLayers], batch_size, this->layer_size[this->nLayers], this->deltas[this->nLayers-1]);
     cudaDeviceSynchronize();
@@ -151,12 +154,21 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
         cudaDeviceSynchronize();
     }
     std::cout << "Compute gradients" << std::endl;
+    //calculate gradients
+    status = cublasCreate(&handle);
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        printf("cuBLAS initialization failed\n");
+        return;
+    };
+    float frac = 1.0f / batch_size;
     for(int i = this->nLayers-1; i > 0; i--) {
         dotProductTransposeSegmented<<<this->layer_size[i],this->layer_size[i+1]>>>(this->activations+this->offsets[i-1], this->deltas[i], this->gradients[i], batch_size, this->layer_size[i], batch_size, this->layer_size[i+1], true);
         cudaDeviceSynchronize();
+        cublasSscal(handle, this->layer_size[i]*this->layer_size[i+1], &frac, this->gradients[i], 1);
     }
     dotProductTransposeSegmented<<<this->layer_size[0],this->layer_size[1]>>>(inputs.get(), this->deltas[0], this->gradients[0], batch_size, this->layer_size[0], batch_size, this->layer_size[1], true);
     cudaDeviceSynchronize();
+    cublasSscal(handle, this->layer_size[0]*this->layer_size[1], &frac, this->gradients[0], 1);
     std::cout << "Finished training" << std::endl;
 }
 
@@ -176,7 +188,7 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
     std::cout << "Layer 0" << std::endl;
     dotProductSegmented<<<nBlocks, nThreads>>>(d_input.get(), this->d_weights[0], d_activations, batch_size, this->layer_size[0], this->layer_size[0], this->layer_size[1], this->d_biases[0]);
     cudaDeviceSynchronize();
-    this->activation_fn(d_activations, batch_size*this->layer_size[1], nWorkers, nThreadsPerWorkers);
+    this->activation_fn(d_activations, batch_size, this->layer_size[1], nWorkers, nThreadsPerWorkers);
     cudaDeviceSynchronize();
     int j = 1;
     for(j = 1; j < this->nLayers-1; j++) {
@@ -184,7 +196,7 @@ std::shared_ptr<float> NeuralNetwork::forward_pass(std::shared_ptr<float> d_inpu
         nThreads.y = this->layer_size[j+1];
         dotProductSegmented<<<nBlocks, nThreads>>>(d_activations+this->offsets[j-1], this->d_weights[j], d_activations+this->offsets[j], batch_size, this->layer_size[j], this->layer_size[j], this->layer_size[j+1], this->d_biases[j]);
         cudaDeviceSynchronize();
-        this->activation_fn(d_activations+this->offsets[j], batch_size*this->layer_size[j+1], nWorkers, nThreadsPerWorkers);
+        this->activation_fn(d_activations+this->offsets[j], batch_size, this->layer_size[j+1], nWorkers, nThreadsPerWorkers);
         cudaDeviceSynchronize();
     }
     std::cout << "Layer " << j << std::endl;

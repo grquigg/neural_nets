@@ -90,9 +90,9 @@ __global__ void auditDeltas(NeuralNetwork* model, float* deltas, int* offsets, i
 __global__ void auditWeights(NeuralNetwork* model);
 
 ////HOST FUNCTIONS
-void sigmoidHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker);
+void sigmoidHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker);
 
-void reluHost(float *inputs, int size, int nWorkers, int nThreadsPerWorker);
+void reluHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker);
 
 void softmaxHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker);
 

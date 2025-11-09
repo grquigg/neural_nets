@@ -55,6 +55,8 @@ if(NOT SRC STREQUAL "")
   add_library(${LIBNAME} ${SRC})
 endif()
 
+# set cublas as target for library
+target_link_libraries(${LIBNAME} cublas)
 # executables
 foreach(EXEC ${EXECLIST})
   get_filename_component(EXECNAME ${EXEC} NAME_WE)
@@ -63,9 +65,7 @@ foreach(EXEC ${EXECLIST})
   if(NOT SRC STREQUAL "")
     message("SRC ${SRC}")
     message("${EXECNAME}")
-    message("${LIBNAME}")
     target_link_libraries(${EXECNAME} LINK_PUBLIC ${LIBNAME})
-
     set_target_properties(${EXECNAME} PROPERTIES
                       CUDA_SEPARABLE_COMPILATION ON)
 
@@ -97,6 +97,7 @@ target_link_libraries(
 
 add_executable(main_tests tests/test.cu)
 target_link_libraries(main_tests GTest::gtest_main ${LIBNAME})
+target_link_libraries(main_tests cublas)
 
 add_executable(example_one tests/example_one.cu)
 target_link_libraries(example_one GTest::gtest_main ${LIBNAME})
@@ -108,3 +109,4 @@ include(GoogleTest)
 gtest_discover_tests(mono_threaded)
 gtest_discover_tests(multi_threaded)
 gtest_discover_tests(main_tests)
+gtest_discover_tests(example_one)

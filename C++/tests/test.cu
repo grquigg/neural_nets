@@ -2,6 +2,21 @@
 #include "../include/lin_alg.h"
 #include "../include/utils.h"
 #include "../include/models.h"
+#include "cublas_v2.h"
+#define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
+TEST(CuBLAS, testLinAlg) {
+    cudaError_t cudaStatus;
+    cublasStatus_t cublasStatus;
+    cublasHandle_t handle;
+    int i, j;
+    cublasStatus = cublasCreate(&handle);
+    if(cublasStatus != CUBLAS_STATUS_SUCCESS) {
+        printf ("CUBLAS initialization failed\n");
+    }
+
+}
+
 // Demonstrate some basic assertions.
 TEST(SegmentedDotProduct, SingleThreaded) {
     int nWorkers = 1, nThreadsPerWorker = 1;
@@ -249,8 +264,8 @@ TEST(Main, ReluHostExample) {
     float arr2[12] = {-1,-5,-9,-2,-6,-10,-3,-7,-11,-4,-8,-12}; // 4 x 3 matrix
     std::shared_ptr<float> darr1 = transferMatrixToDevice(arr1, 2, 3);
     std::shared_ptr<float> darr2 = transferMatrixToDevice(arr2, 4, 3);
-    reluHost(darr1.get(), 6, 2, 3);
-    reluHost(darr2.get(), 12, 4, 3);
+    reluHost(darr1.get(), 2, 3, 2, 3);
+    reluHost(darr2.get(), 4, 3, 4, 3);
     cudaMemcpy(arr1, darr1.get(), 6*sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(arr2, darr2.get(), 12*sizeof(float), cudaMemcpyDeviceToHost);
     for(int i = 0; i < 6; i++) {
@@ -265,7 +280,7 @@ TEST(Main, ReluCheckOrdering) {
     float correct[12] = {0, 0, 0, 0, 6, 10, 3, 7, 0, 0, 0, 0};
     float arr[12] = {-1,-5,-9,-2,6,10,3,7,-11,-4,-8,-12}; // 4 x 3 matrix
     std::shared_ptr<float> darr = transferMatrixToDevice(arr, 4, 3);
-    reluHost(darr.get(), 12, 4, 3);
+    reluHost(darr.get(), 4, 3, 4, 3);
     cudaMemcpy(arr, darr.get(), 12*sizeof(float), cudaMemcpyDeviceToHost);
     for(int i = 0; i < 12; i++) {
         EXPECT_FLOAT_EQ(arr[i], correct[i]);
