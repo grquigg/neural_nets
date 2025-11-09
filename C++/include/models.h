@@ -53,10 +53,9 @@ class NeuralNetwork {
         std::vector<dim3> backward_pass_specs;
 
         std::function<void(float * inputs, int height, int width, int nWorkers, int nThreadsPerWorker)> activation_fn;
-        std::function<void()> activation_derivative;
+        std::function<__global__ void(float* activations, int height, int width, float * delta)> activation_derivative;
         std::function<void(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker)> final_activation;
         std::function<void()> final_activation_derivative;
-
         NeuralNetwork();
         NeuralNetwork(int nLayers, int * layer_size);
         NeuralNetwork(int nLayers, int * layer_size, float** weights, float ** biases, float lambda);

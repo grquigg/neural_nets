@@ -10,7 +10,7 @@ __global__ void test_func(float* mat, float* weights, float* prod, int vector_h,
 
 __device__ void relu(float* inputs, int size);
 
-__global__ void reluDerivative(float* mat, int height, int width);
+__global__ void reluDerivative(float* activations, int height, int width, float * delta);
 
 __global__ void testRelu(float* mat, int height, int width);
 

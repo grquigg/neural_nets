@@ -228,3 +228,97 @@ TEST(NeuralNetwork, TestGradients) {
         }    
     }
 }
+
+
+///// RELU testing
+
+TEST(NeuralNetwork, TestForwardPropForReluExOne) {
+    int batch_size = 1;
+    int * layers = new int[3]{1,2, 1};
+    int nLayers = 2;
+    float input[2] = {0.13000f, 0.42f};
+    float **weights = new float*[2];
+    weights[0] = new float[2]{0.1f, 0.2f};
+    weights[1] = new float[2]{0.5f, 0.6f};
+    float **biases = new float*[2];
+    biases[0] = new float[2]{0.4f, 0.3f};
+    biases[1] = new float[1]{0.7f};
+    NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
+    float correctOutput[3] = {0.413f,0.326f, 0.75065339f};
+    model.setupGPU(1, batch_size);
+    model.final_activation = sigmoidHost;
+    model.activation_fn = reluHost;
+    std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 1);
+    std::shared_ptr<float> activations = model.forward_pass(d_input, 1, 1, 1, 1);
+    for(int i = 0; i < 3; i++) {
+        EXPECT_FLOAT_EQ(activations.get()[i], correctOutput[i]);
+    }
+}
+
+TEST(NeuralNetwork, TestForwardPropForReluExTwo) {
+    int batch_size = 1;
+    int * layers = new int[3]{1,2, 1};
+    int nLayers = 2;
+    float input[2] = {0.13000f, 0.42f};
+    float **weights = new float*[2];
+    weights[0] = new float[2]{0.1f, 0.2f};
+    weights[1] = new float[2]{0.5f, 0.6f};
+    float **biases = new float*[2];
+    biases[0] = new float[2]{0.4f, 0.3f};
+    biases[1] = new float[1]{0.7f};
+    NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
+    float correctOutput[3] = {0.442f,0.384f, 0.75976654f};
+    model.setupGPU(1, batch_size);
+    model.final_activation = sigmoidHost;
+    model.activation_fn = reluHost;
+    std::shared_ptr<float> d_input = transferMatrixToDevice(input+1, 1, 1);
+    std::shared_ptr<float> activations = model.forward_pass(d_input, 1, 1, 1, 1);
+    for(int i = 0; i < 3; i++) {
+        EXPECT_FLOAT_EQ(activations.get()[i], correctOutput[i]);
+    }
+}
+
+TEST(NeuralNetwork, TestBackpropForReluExOne) {
+    int batch_size = 1;
+    int * layers = new int[3]{1,2, 1};
+    int nLayers = 2;
+    float input[2] = {0.13000f, 0.42f};
+    float output[2] = {0.9f, 0.23f};
+    float **weights = new float*[2];
+    weights[0] = new float[2]{0.1f, 0.2f};
+    weights[1] = new float[2]{0.5f, 0.6f};
+    float **biases = new float*[2];
+    biases[0] = new float[2]{0.4f, 0.3f};
+    biases[1] = new float[1]{0.7f};
+    NeuralNetwork model(nLayers, layers, weights, biases, 1.0f);
+    model.setupGPU(1, batch_size);
+    model.final_activation = sigmoidHost;
+    model.activation_fn = reluHost;
+    std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 1);
+    std::shared_ptr<float> d_y = transferMatrixToDevice(output, 2, 1);
+    model.forward_pass(d_input, batch_size, batch_size, 1, 1);
+    
+    model.backprop(batch_size, d_input, d_y);
+    float **correctGradients = new float*[model.nLayers];
+    float **correctDeltas = new float*[model.nLayers];
+    correctGradients[0] = new float[2]{-0.009711f, -0.01165f};
+    correctGradients[1] = new float[2]{-0.061680146f, -0.048687f};
+    correctDeltas[0] = new float[2]{-0.0747f, -0.08961f};
+    correctDeltas[1] = new float[1]{-0.14934659f};
+    float **deltas = new float*[model.nLayers];
+    float **gradients = new float*[model.nLayers];
+    for(int i = 0; i < model.nLayers; i++) {
+        std::cout << "Batch: " << batch_size*model.layer_size[i+1] << std::endl;
+        deltas[i] = new float[batch_size*model.layer_size[i+1]];
+        gradients[i] = new float[model.layer_size[i]*model.layer_size[i+1]];
+        cudaMemcpy(deltas[i], model.deltas[i], batch_size*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(gradients[i], model.gradients[i], model.layer_size[i]*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+        for(int j = 0; j < batch_size*model.layer_size[i+1]; j++) {
+            EXPECT_FLOAT_EQ(deltas[i][j], correctDeltas[i][j]);
+        }
+        for(int j = 0; j < model.layer_size[i]*model.layer_size[i+1]; j++) {
+            EXPECT_FLOAT_EQ(gradients[i][j], correctGradients[i][j]);
+        }    
+    }   
+}
+

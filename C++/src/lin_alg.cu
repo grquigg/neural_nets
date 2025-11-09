@@ -16,6 +16,17 @@ void reluHost(float *inputs, int height, int width, int nWorkers, int nThreadsPe
     testRelu<<<nWorkers, nThreadsPerWorker>>>(inputs, nWorkers, nThreadsPerWorker);
 }
 
+__global__ void reluDerivative(float* activations, int height, int width, float * delta) {
+    if((height * width) % (gridDim.x * blockDim.x) != 0) {
+        printf("Bad outcome\n");
+    }
+    int batch = (height * width) / (gridDim.x * blockDim.x);
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    for(int i = 0; i < batch; i++) {
+        delta[index*batch+i] *= (activations[index*batch+i] > 0);
+    }
+}
+
 void softmaxHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker) {
     softmaxSegmented<<<nWorkers, nThreadsPerWorker>>>(inputs, height, width);
 }
@@ -74,7 +85,6 @@ __global__ void sigmoidD(float* activations, int height, int width, float * delt
     if((height * width) % (gridDim.x * blockDim.x) != 0) {
         printf("Bad outcome\n");
     }
-    printf("Sigmoid\n");
     int batch = (height * width) / (gridDim.x * blockDim.x);
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     for(int i = 0; i < batch; i++) {
