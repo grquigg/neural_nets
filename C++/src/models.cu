@@ -99,6 +99,7 @@ NeuralNetwork::NeuralNetwork(int nLayers, int * layer_size, float** weights, flo
     this->activations = nullptr;
     this->activation_fn = sigmoidHost;
     this->final_activation = softmaxHost;
+    this->activation_derivative = sigmoidDerivativeHost;
 }
 
 void NeuralNetwork::setupDeltas(int batch_size) {
@@ -135,7 +136,6 @@ void NeuralNetwork::setupMultiThreadSpecs(int batch_size) {
     }
 }
 
-
 void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std::shared_ptr<float> outputs) {
     cublasHandle_t handle;
     cublasStatus_t status;
@@ -150,7 +150,8 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
         */
         dotProductTransposeSegmented<<<batch_size, this->layer_size[i]>>>(this->deltas[i], this->d_weights[i], this->deltas[i-1], batch_size, this->layer_size[i+1], this->layer_size[i], this->layer_size[i+1], false);
         cudaDeviceSynchronize();
-        sigmoidD<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
+        this->activation_derivative(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1], batch_size, this->layer_size[i]);
+        // sigmoidD<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
         cudaDeviceSynchronize();
     }
     std::cout << "Compute gradients" << std::endl;
@@ -164,10 +165,20 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
     for(int i = this->nLayers-1; i > 0; i--) {
         dotProductTransposeSegmented<<<this->layer_size[i],this->layer_size[i+1]>>>(this->activations+this->offsets[i-1], this->deltas[i], this->gradients[i], batch_size, this->layer_size[i], batch_size, this->layer_size[i+1], true);
         cudaDeviceSynchronize();
+        if(this->regularizeGrads) {
+            std::cout << "REGULARIZE" << std::endl;
+            std::cout << "Layer " << i << std::endl;
+            std::cout << this->layer_size[i] << " " << this->layer_size[i+1] << std::endl;
+            regularize<<<this->layer_size[i], this->layer_size[i+1]>>>(this->gradients[i], this->layer_size[i]*this->layer_size[i+1], this->lambda, this->d_weights[i]);
+        }
         cublasSscal(handle, this->layer_size[i]*this->layer_size[i+1], &frac, this->gradients[i], 1);
     }
     dotProductTransposeSegmented<<<this->layer_size[0],this->layer_size[1]>>>(inputs.get(), this->deltas[0], this->gradients[0], batch_size, this->layer_size[0], batch_size, this->layer_size[1], true);
     cudaDeviceSynchronize();
+    if(this->regularizeGrads) {
+        std::cout << "REGULARIZE" << std::endl;
+        regularize<<<this->layer_size[0], this->layer_size[1]>>>(this->gradients[0], this->layer_size[0]*this->layer_size[1], this->lambda, this->d_weights[0]);
+    }
     cublasSscal(handle, this->layer_size[0]*this->layer_size[1], &frac, this->gradients[0], 1);
     std::cout << "Finished training" << std::endl;
 }

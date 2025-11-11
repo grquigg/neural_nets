@@ -45,6 +45,7 @@ class NeuralNetwork {
         float ** gradients; //allocated exclusively to GPU
         float ** grad_biases; //allocated exclusively to GPU
         bool on_device = false;
+        bool regularizeGrads = false;
         float * activations;
         float ** deltas;
         int * offsets;
@@ -53,7 +54,7 @@ class NeuralNetwork {
         std::vector<dim3> backward_pass_specs;
 
         std::function<void(float * inputs, int height, int width, int nWorkers, int nThreadsPerWorker)> activation_fn;
-        std::function<__global__ void(float* activations, int height, int width, float * delta)> activation_derivative;
+        std::function<void(float* activations, int height, int width, float * delta, int nWorkers, int nThreadsPerWorker)> activation_derivative;
         std::function<void(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker)> final_activation;
         std::function<void()> final_activation_derivative;
         NeuralNetwork();

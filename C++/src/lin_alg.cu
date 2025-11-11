@@ -92,8 +92,13 @@ __global__ void sigmoidD(float* activations, int height, int width, float * delt
     }
 }
 
+void reluDerivativeHost(float *inputs, int height, int width, float * deltas, int nWorkers, int nThreadsPerWorker) {
+    reluDerivative<<<nWorkers, nThreadsPerWorker>>>(inputs, height, width, deltas);
+}
 
-
+void sigmoidDerivativeHost(float *inputs, int height, int width, float * deltas, int nWorkers, int nThreadsPerWorker) {
+    sigmoidD<<<nWorkers, nThreadsPerWorker>>>(inputs, height, width, deltas);
+}
 __device__ float* transposeMatrix(float * matrix, int matrix_height, int matrix_width) {
     float * transpose = new float[matrix_width*matrix_height];
     for(int i = 0; i < matrix_height; i++) {
@@ -155,13 +160,13 @@ __global__ void dotProductTransposeSegmented(float* inputs, float* weights, floa
         printf("Index x %d, Index y %d\n", index_x, index_y);
         for(int i = 0; i < vector_h; i++) {
             for(int j = 0; j < vector_w; j++) {
-                printf("matrix 1 at %d, %d: %f\n", i, j, inputs[i*vector_w+j]);
+                // printf("matrix 1 at %d, %d: %f\n", i, j, inputs[i*vector_w+j]);
             }
         }
 
         for(int i = 0; i < weight_h; i++) {
             for(int j = 0; j < weight_w; j++) {
-                printf("matrix 2 at %d, %d: %f\n", i, j, weights[i*weight_w+j]);
+                // printf("matrix 2 at %d, %d: %f\n", i, j, weights[i*weight_w+j]);
             }
         }
         //index_x*batch_size_x indicates the starting row of the input matrix
@@ -174,7 +179,7 @@ __global__ void dotProductTransposeSegmented(float* inputs, float* weights, floa
                 for(int k = 0; k < vector_h; k++) {
                     product[(index_x*batch_size_x+i)*weight_w+(index_y*batch_size_y+j)] += inputs[index_x*batch_size_x+i+(vector_w*k)] * weights[index_y*batch_size_y+j+(weight_w*k)];
                 }
-                printf("%f\n", product[(index_x*batch_size_x+i)*weight_w+(index_y*batch_size_y+j)]);
+                // printf("%f\n", product[(index_x*batch_size_x+i)*weight_w+(index_y*batch_size_y+j)]);
             }
         }
     } else if(vector_w == weight_w) {
@@ -195,7 +200,7 @@ __global__ void dotProductTransposeSegmented(float* inputs, float* weights, floa
                 for(int k = 0; k < vector_w; k++) {
                     product[(index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j] += inputs[(index_x*batch_size_x+i)*vector_w+k] * weights[(index_y*batch_size_y+j)*weight_w+k];
                 }
-                printf("%f\n", product[(index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j]);
+                // printf("%f\n", product[(index_x*batch_size_x+i)*weight_h+index_y*batch_size_y+j]);
             }
         }
     }
@@ -668,3 +673,19 @@ __global__ void softmaxSegmented(float* product, int product_height, int product
     softmax(product+(blockSize*index*product_width), blockSize, product_width);
 }
 
+__device__ void regularizer(float * gradients, int size, float lambda, float* weights) {
+    for(int i = 0; i < size; i++) {
+        // printf("%f %f\n", gradients[i], weights[i]);
+        gradients[i] += (weights[i] * lambda);
+    }
+}
+
+__global__ void regularize(float * gradients, int size, float lambda, float* weights) {
+    if(size % (blockDim.x * gridDim.x) != 0) {
+        printf("BAD ARGUMENT\n");
+        return;
+    }
+    int blockSize = size / (blockDim.x * gridDim.x);
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    regularizer(gradients+(blockSize*index), blockSize, lambda, weights+(blockSize*index));
+}

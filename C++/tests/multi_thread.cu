@@ -1057,7 +1057,9 @@ TEST(CalculateDeltas, NNExample2) {
 //   NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
 //   model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
 //   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 1);
-//   std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 1, 2);
+//   std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 2, 1);
+//   model.activation_fn = reluHost;
+//   model.activation_derivative = reluDerivativeHost;
 //   std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
   
 //   model.backprop(batch_size, d_input, d_y);
@@ -1093,24 +1095,42 @@ TEST(ComputeGradients, NNExample2Gradient) {
   NeuralNetwork model(nLayers, layers, weights, biases, 1.0);
   model.setupGPU(nWorkers*nThreadsPerWorker, batch_size);
   model.activation_fn = reluHost;
+  model.activation_derivative = reluDerivativeHost;
+  model.regularizeGrads = true;
+  model.lambda = 0.250f;
   std::shared_ptr<float> d_input = transferMatrixToDevice(input, 2, 2);
   std::shared_ptr<float> d_y = transferMatrixToDevice(ys, 2, 2);
-  model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
+  std::shared_ptr<float> activations = model.forward_pass(d_input, 2, batch_size, nWorkers, nThreadsPerWorker);
   
+  float correctActivations[18] = {0.74f, 1.1192f, 0.3564f, 0.8744f, 0.5525f, 0.8138f, 0.1761f, 0.6041f,
+  1.96536f, 2.296904f, 1.664372f, 1.38873f, 1.858811f, 1.166318f, 0.47493816f, 0.52506184f, 0.44214564f, 0.55785436f};
+  for(int i = 0; i < 18; i++) {
+    EXPECT_FLOAT_EQ(correctActivations[i], activations.get()[i]);
+  }
   model.backprop(batch_size, d_input, d_y);
   float **deltas = new float*[model.nLayers];
+  float **correctDeltas = new float*[model.nLayers];
   float **correctGradients = new float*[model.nLayers];
   //relu numbers
-  correctGradients[2] = new float[6]{-0.37531106f, -0.24162629f, -0.54951686f, -0.14548527f, -0.34218066f, -0.13030989f};
-  correctGradients[1] = new float[6]{-0.03025601f, -0.05286462f, -0.06961101f,-0.02497924f,0.011581795f,0.0035215414f};
-  correctGradients[0] = new float[8]{-0.12641214f, -0.06353569f, -0.16836246f, -0.11637328f,-0.18149873f, -0.10817513f, -0.20956937f, -0.1799131f};
+  correctDeltas[0] = new float[8]{-0.6782821f , -0.5171672f , -0.7658614f , -0.77661437f, -0.088282049f,  0.016171142f, -0.16764985f, -0.086421765f};
+  correctDeltas[1] = new float[6]{-0.28479762f, -0.54771722f, -0.45969011f, -0.24004786f,  0.13466272f,  0.028556634f};
+  correctDeltas[2] = new float[4]{-0.27506184f, -0.45493816f,-0.30785436f,  0.27785436f};
+  correctGradients[2] = new float[6]{-0.3753112f, -0.24162629f, -0.54951686f, -0.14548534f, -0.34218066f, -0.13030989f};
+  correctGradients[1] = new float[12]{-0.087938406f, -0.11295483f, -0.092196591f,-0.23954831f, -0.22670826f, -0.14562286f, 0.048112825f, -0.04574615f,  0.0068476349f, -0.088270038f, -0.087537125f, -0.18110096f};
+  correctGradients[0] = new float[8]{-0.12641214f, -0.063535735f, -0.16836253f, -0.11637335f,-0.18149873f, -0.10817517f, -0.20956937f, -0.1799131f};
   float **gradients = new float*[model.nLayers];
-  int i = 2;
-  // for(int i = 0; i < 1; i++) {
+  // int i = 2;
+  for(int i = 0; i < model.nLayers; i++) {
+    std::cout << "Layer #" << i << std::endl;
     gradients[i] = new float[model.layer_size[i]*model.layer_size[i+1]];
+    deltas[i] = new float[batch_size*model.layer_size[i+1]];
     cudaMemcpy(gradients[i], model.gradients[i], model.layer_size[i]*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(deltas[i], model.deltas[i], batch_size*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
     for(int j = 0; j < model.layer_size[i]*model.layer_size[i+1]; j++) {
       EXPECT_FLOAT_EQ(correctGradients[i][j], gradients[i][j]);
     }
-  // }
+    for(int j = 0; j < model.layer_size[i+1]*batch_size; j++) {
+      EXPECT_FLOAT_EQ(correctDeltas[i][j], deltas[i][j]);
+    }
+  }
 }

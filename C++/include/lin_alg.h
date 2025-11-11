@@ -26,6 +26,8 @@ __device__ void matrixMultiplyByScalar(float* matrix, int m1_h, int m1_w, float 
 
 __device__ void sigmoid(float* inputs, int size);
 
+__device__ void regularizer(float * gradients, int size, float regularizer, float* weights);
+
 __global__ void sigmoidD(float* activations, int height, int width, float * delta);
 
 __global__ void sigmoidSegmented(float * inputs, int inputSize);
@@ -69,6 +71,8 @@ __global__ void ringReduce(float * gradients, const int total_steps, const int s
 __global__ void ringReduce(LogisticRegression * model, const int total_steps, const int step_size, const int chunk_size);
 
 
+__global__ void regularize(float* gradients, int size, float lambda, float * weights);
+
 /////NEURAL NETWORKS /////
 __global__ void backprop(NeuralNetwork* model, float* inputs, float* outputs, float* activations, float* deltas, int* offsets, int size, int nClasses);
 
@@ -96,4 +100,7 @@ void reluHost(float *inputs, int height, int width, int nWorkers, int nThreadsPe
 
 void softmaxHost(float *inputs, int height, int width, int nWorkers, int nThreadsPerWorker);
 
+void sigmoidDerivativeHost(float *inputs, int height, int width, float * deltas, int nWorkers, int nThreadsPerWorker);
+
+void reluDerivativeHost(float *inputs, int height, int width, float * deltas, int nWorkers, int nThreadsPerWorker);
 #endif

@@ -294,6 +294,7 @@ TEST(NeuralNetwork, TestBackpropForReluExOne) {
     model.setupGPU(1, batch_size);
     model.final_activation = sigmoidHost;
     model.activation_fn = reluHost;
+    model.activation_derivative = reluDerivativeHost;
     std::shared_ptr<float> d_input = transferMatrixToDevice(input, 1, 1);
     std::shared_ptr<float> d_y = transferMatrixToDevice(output, 2, 1);
     model.forward_pass(d_input, batch_size, batch_size, 1, 1);
@@ -301,9 +302,9 @@ TEST(NeuralNetwork, TestBackpropForReluExOne) {
     model.backprop(batch_size, d_input, d_y);
     float **correctGradients = new float*[model.nLayers];
     float **correctDeltas = new float*[model.nLayers];
-    correctGradients[0] = new float[2]{-0.009711f, -0.01165f};
+    correctGradients[0] = new float[2]{-0.0097075282f, -0.011649034f};
     correctGradients[1] = new float[2]{-0.061680146f, -0.048687f};
-    correctDeltas[0] = new float[2]{-0.0747f, -0.08961f};
+    correctDeltas[0] = new float[2]{-0.074673295f, -0.089607954f};
     correctDeltas[1] = new float[1]{-0.14934659f};
     float **deltas = new float*[model.nLayers];
     float **gradients = new float*[model.nLayers];
