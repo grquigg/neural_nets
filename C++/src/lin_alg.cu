@@ -689,3 +689,17 @@ __global__ void regularize(float * gradients, int size, float lambda, float* wei
     int index = blockIdx.x*blockDim.x + threadIdx.x;
     regularizer(gradients+(blockSize*index), blockSize, lambda, weights+(blockSize*index));
 }
+
+__global__ void getGradientBiases(float *deltas, float* grad_biases, int height, int width) {
+    if(width % (blockDim.x * gridDim.x) != 0) {
+        printf("BAD ARGUMENT\n");
+        return;
+    }
+    int blockSize = width / (blockDim.x * gridDim.x);
+    int index = blockIdx.x*blockDim.x + threadIdx.x;
+    for(int i = index; i < index+blockSize; i++) {
+        for(int j = 0; j < height; j++) {
+            grad_biases[i] += deltas[i+(width*j)];
+        }
+    }
+}

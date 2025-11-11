@@ -150,8 +150,8 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
         */
         dotProductTransposeSegmented<<<batch_size, this->layer_size[i]>>>(this->deltas[i], this->d_weights[i], this->deltas[i-1], batch_size, this->layer_size[i+1], this->layer_size[i], this->layer_size[i+1], false);
         cudaDeviceSynchronize();
+        getGradientBiases<<<this->layer_size[i+1], 1>>>(this->deltas[i], this->grad_biases[i], this->layer_size[i],this->layer_size[i+1]);
         this->activation_derivative(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1], batch_size, this->layer_size[i]);
-        // sigmoidD<<<batch_size, this->layer_size[i]>>>(this->activations+this->offsets[i-1], batch_size, this->layer_size[i], this->deltas[i-1]);
         cudaDeviceSynchronize();
     }
     std::cout << "Compute gradients" << std::endl;
@@ -172,14 +172,17 @@ void NeuralNetwork::backprop(int batch_size, std::shared_ptr<float> inputs, std:
             regularize<<<this->layer_size[i], this->layer_size[i+1]>>>(this->gradients[i], this->layer_size[i]*this->layer_size[i+1], this->lambda, this->d_weights[i]);
         }
         cublasSscal(handle, this->layer_size[i]*this->layer_size[i+1], &frac, this->gradients[i], 1);
+        cublasSscal(handle, this->layer_size[i+1], &frac, this->grad_biases[i], 1);
     }
     dotProductTransposeSegmented<<<this->layer_size[0],this->layer_size[1]>>>(inputs.get(), this->deltas[0], this->gradients[0], batch_size, this->layer_size[0], batch_size, this->layer_size[1], true);
+    getGradientBiases<<<this->layer_size[1], 1>>>(this->deltas[0], this->grad_biases[0], this->layer_size[0],this->layer_size[1]);
     cudaDeviceSynchronize();
     if(this->regularizeGrads) {
         std::cout << "REGULARIZE" << std::endl;
         regularize<<<this->layer_size[0], this->layer_size[1]>>>(this->gradients[0], this->layer_size[0]*this->layer_size[1], this->lambda, this->d_weights[0]);
     }
     cublasSscal(handle, this->layer_size[0]*this->layer_size[1], &frac, this->gradients[0], 1);
+    cublasSscal(handle, this->layer_size[1], &frac, this->grad_biases[0], 1);
     std::cout << "Finished training" << std::endl;
 }
 

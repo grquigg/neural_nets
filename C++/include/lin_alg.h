@@ -51,6 +51,8 @@ __global__ void dotProductTransposeSegmented(float* inputs, float* weights, floa
 
 //////////GLOBALS////////
 
+__global__ void getGradientBiases(float *deltas, float* grad_biases, int height, int width);
+
 __global__ void predict(LogisticRegression* model, float* inputs, float* product, int size);
 
 __global__ void predict(float * inputs, float* weights, float * product, int size, int n_features, int n_classes);

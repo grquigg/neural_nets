@@ -1111,6 +1111,7 @@ TEST(ComputeGradients, NNExample2Gradient) {
   float **deltas = new float*[model.nLayers];
   float **correctDeltas = new float*[model.nLayers];
   float **correctGradients = new float*[model.nLayers];
+  float **gradBiases = new float*[model.nLayers];
   //relu numbers
   correctDeltas[0] = new float[8]{-0.6782821f , -0.5171672f , -0.7658614f , -0.77661437f, -0.088282049f,  0.016171142f, -0.16764985f, -0.086421765f};
   correctDeltas[1] = new float[6]{-0.28479762f, -0.54771722f, -0.45969011f, -0.24004786f,  0.13466272f,  0.028556634f};
@@ -1118,19 +1119,28 @@ TEST(ComputeGradients, NNExample2Gradient) {
   correctGradients[2] = new float[6]{-0.3753112f, -0.24162629f, -0.54951686f, -0.14548534f, -0.34218066f, -0.13030989f};
   correctGradients[1] = new float[12]{-0.087938406f, -0.11295483f, -0.092196591f,-0.23954831f, -0.22670826f, -0.14562286f, 0.048112825f, -0.04574615f,  0.0068476349f, -0.088270038f, -0.087537125f, -0.18110096f};
   correctGradients[0] = new float[8]{-0.12641214f, -0.063535735f, -0.16836253f, -0.11637335f,-0.18149873f, -0.10817517f, -0.20956937f, -0.1799131f};
+  gradBiases[0] = new float[4]{-0.38328202f, -0.25049799f, -0.46675556f, -0.43151814f};
+  gradBiases[1] = new float[3]{-0.26242274f, -0.20652728f, -0.2155667f};
+  gradBiases[2] = new float[2]{-0.2914581f, -0.08854194f};
   float **gradients = new float*[model.nLayers];
+  float **grad_biases = new float*[model.nLayers];
   // int i = 2;
   for(int i = 0; i < model.nLayers; i++) {
     std::cout << "Layer #" << i << std::endl;
     gradients[i] = new float[model.layer_size[i]*model.layer_size[i+1]];
+    grad_biases[i] = new float[model.layer_size[i+1]];
     deltas[i] = new float[batch_size*model.layer_size[i+1]];
     cudaMemcpy(gradients[i], model.gradients[i], model.layer_size[i]*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(deltas[i], model.deltas[i], batch_size*model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(grad_biases[i], model.grad_biases[i], model.layer_size[i+1]*sizeof(float), cudaMemcpyDeviceToHost);
     for(int j = 0; j < model.layer_size[i]*model.layer_size[i+1]; j++) {
       EXPECT_FLOAT_EQ(correctGradients[i][j], gradients[i][j]);
     }
     for(int j = 0; j < model.layer_size[i+1]*batch_size; j++) {
       EXPECT_FLOAT_EQ(correctDeltas[i][j], deltas[i][j]);
+    }
+    for(int j = 0; j < model.layer_size[i+1]; j++) {
+      EXPECT_FLOAT_EQ(gradBiases[i][j], grad_biases[i][j]);
     }
   }
 }
